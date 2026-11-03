@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.env
+.env.*
+!.env.production.example
+npm-debug.log*
+.DS_Store
+*.md
+
+# File dump database thật (dù đã mã hoá) — không cần và không nên nằm trong
+# build context/image layer. Bind-mount trực tiếp ra ~/itams/backups trên
+# VPS (xem docker-compose.yml), không cần COPY vào image lúc build.
+backups

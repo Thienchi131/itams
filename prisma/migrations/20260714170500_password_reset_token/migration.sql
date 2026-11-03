@@ -1,0 +1,25 @@
+-- Bảng lưu token "Quên mật khẩu" tự phục vụ qua email (self-service forgot
+-- password) — khác với resetUserPasswordAction (Admin tự bấm Reset cho user
+-- khác, không cần bảng này). Lưu tokenHash (SHA-256 của token thật) thay vì
+-- token thật, giống cách lưu password — token thật chỉ có trong email đã gửi
+-- cho user, không bao giờ lưu ở DB.
+-- CreateTable
+CREATE TABLE "PasswordResetToken" (
+    "id" SERIAL NOT NULL,
+    "userId" INTEGER NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "usedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "PasswordResetToken_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PasswordResetToken_tokenHash_key" ON "PasswordResetToken"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "PasswordResetToken_userId_idx" ON "PasswordResetToken"("userId");
+
+-- AddForeignKey
+ALTER TABLE "PasswordResetToken" ADD CONSTRAINT "PasswordResetToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

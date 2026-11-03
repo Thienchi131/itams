@@ -32,6 +32,11 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.production.example
+
+# backup database (Cài đặt > Backup & Restore + cron scripts/backup-db.sh) —
+# file dump DB thật (dù đã mã hoá AES-256-GCM), không được để lọt vào git.
+/backups/
 
 # vercel
 .vercel
@@ -39,3 +44,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/app/generated/prisma
+
+# file hệ thống/home Linux lẫn trong thư mục trên VPS
+.bash*
+.profile
+.sudo_as_admin_successful
+.cache/
+.config/
+.ssh/
+.docker/
+_to_delete/

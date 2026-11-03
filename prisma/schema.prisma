@@ -1,0 +1,640 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  users     User[]
+}
+
+model User {
+  id                     Int                  @id @default(autoincrement())
+  username               String               @unique
+  fullName               String
+  password               String
+  roleId                 Int
+  regionId               Int?
+  // Ghi đè hẹp hơn Region — dùng cho nhân viên chỉ phụ trách ĐÚNG 1 kho lẻ
+  // (VD nhân viên kho DXB 2), phân biệt với Lead phụ trách nguyên khu vực
+  // (vẫn dùng regionId, thấy hết mọi kho trong Region đó). Chỉ nên set 1
+  // trong 2 cột (regionId HOẶC warehouseId) tại 1 thời điểm — UI chặn chọn
+  // đồng thời cả 2; nếu lỡ cả 2 cùng có giá trị, warehouseId được ưu tiên
+  // (hẹp hơn, an toàn hơn về mặt lộ dữ liệu). Xem thêm getCurrentUser().
+  warehouseId            Int?
+  mustChangePassword     Boolean              @default(true)
+  twoFactorEnabled       Boolean              @default(false)
+  twoFactorSecret        String?
+  lastNotificationReadAt DateTime?
+  createdAt              DateTime             @default(now())
+  role                   Role                 @relation(fields: [roleId], references: [id])
+  region                 Region?              @relation(fields: [regionId], references: [id])
+  warehouse              Warehouse?           @relation(fields: [warehouseId], references: [id])
+  passwordResetTokens    PasswordResetToken[]
+  // Danh sách kho BỔ SUNG ngoài regionId/warehouseId ở trên — dùng cho case
+  // 1 user cần xem nhiều kho tuỳ ý CẮT NGANG nhiều Region khác nhau (VD kế
+  // toán cần xem kho ở khu vực Dubai + kho ở khu vực Lào cùng lúc, mà không
+  // muốn gộp 2 khu vực đó lại làm 1 vì sẽ ảnh hưởng phân quyền của Lead đang
+  // phụ trách riêng từng khu vực). regionId/warehouseId chỉ diễn tả được 1
+  // Region/1 Warehouse; nhu cầu "tổ hợp tuỳ ý, cắt ngang nhiều Region" thì
+  // cần 1 danh sách nhiều-nhiều riêng — xem getCurrentUser() để biết cách
+  // cộng dồn vào regionWarehouseIds lúc tính phạm vi xem.
+  warehouseAccess        UserWarehouseAccess[]
+
+  @@index([regionId])
+  @@index([warehouseId])
+}
+
+model UserWarehouseAccess {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  warehouseId Int
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, warehouseId])
+  @@index([userId])
+  @@index([warehouseId])
+}
+
+// Nhóm nhiều Warehouse lại thành 1 "khu vực" — 1 tài khoản được gán theo
+// Region (Lead) sẽ thấy TOÀN BỘ warehouse thuộc region đó. VD: Region
+// "Dubai" chứa các kho "Dubai 1", "Dubai 2", "RAK 1", "RAK 2", "RAK 3" —
+// Lead phụ trách khu vực Dubai xem được cả 5 kho này. Mỗi Warehouse ban đầu
+// coi như tự động thuộc 1 Region cùng tên với nó (xem migration
+// 20260716000000_region_scoped_access) để giữ nguyên phạm vi truy cập hiện
+// tại của mọi tài khoản lúc mới chuyển đổi, sau đó Admin có thể gộp nhiều
+// Warehouse vào chung 1 Region qua Cài đặt > Khu vực.
+// Nhân viên chỉ phụ trách ĐÚNG 1 kho lẻ (không phải cả khu vực) thì dùng
+// User.warehouseId thay vì regionId — xem migration
+// 20260717000000_user_single_warehouse_override.
+model Region {
+  id         Int         @id @default(autoincrement())
+  name       String      @unique
+  warehouses Warehouse[]
+  users      User[]
+}
+
+// Token "Quên mật khẩu" tự phục vụ qua email — khác với resetUserPasswordAction
+// (Admin bấm Reset thủ công cho user khác). Lưu HASH của token thay vì token
+// thật (giống cách lưu password) để nếu lộ DB cũng không dùng lại được token
+// sống; token thật chỉ tồn tại trong email đã gửi.
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model Team {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  employees Employee[]
+}
+
+model Position {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  employees Employee[]
+}
+
+model Employee {
+  id           Int               @id @default(autoincrement())
+  employeeCode String            @unique
+  fullName     String
+  email        String?
+  teamId       Int?
+  positionId   Int?
+  isActive     Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  assets       Asset[]
+  assignments  AssetAssignment[]
+  position     Position?         @relation(fields: [positionId], references: [id])
+  team         Team?             @relation(fields: [teamId], references: [id])
+
+  @@index([fullName])
+  @@index([teamId])
+  @@index([positionId])
+}
+
+model Warehouse {
+  id       Int      @id @default(autoincrement())
+  code     String   @unique
+  name     String
+  regionId Int?
+  // Kho "dùng chung" — hiển thị/thao tác được cho TẤT CẢ tài khoản, bất kể
+  // họ đang bị giới hạn theo Region hay theo 1 Warehouse cụ thể. Khác với
+  // "Không thuộc khu vực" (regionId = null, chỉ nghĩa là chưa gán khu vực,
+  // mặc định vẫn CHỈ tài khoản không-giới-hạn mới thấy) — isShared là cờ
+  // CHỦ ĐỘNG đánh dấu 1 kho là dùng chung thật sự (VD: kho máy đã thanh
+  // lý/hết khấu hao mà ai cũng cần chuyển máy vào).
+  isShared Boolean  @default(false)
+  region   Region?  @relation(fields: [regionId], references: [id])
+  assets   Asset[]
+  supplies Supply[]
+  users    User[]
+  userAccess UserWarehouseAccess[]
+  // Asset đang có lượt luân chuyển ĐẾN kho này, chờ IT kho này xác nhận —
+  // đặt tên quan hệ riêng ("AssetPendingTransfer") vì Asset đã có 1 quan hệ
+  // khác không tên tới Warehouse (qua warehouseId) rồi, Prisma bắt buộc
+  // phải đặt tên khi có quan hệ thứ 2 cùng cặp model.
+  pendingTransferAssets Asset[] @relation("AssetPendingTransfer")
+
+  @@index([regionId])
+}
+
+model Vendor {
+  id    Int     @id @default(autoincrement())
+  name  String  @unique
+  phone String?
+  email String?
+  note  String?
+}
+
+model AssetCategory {
+  id     Int          @id @default(autoincrement())
+  name   String       @unique
+  models AssetModel[]
+}
+
+model AssetModel {
+  id             Int           @id @default(autoincrement())
+  categoryId     Int
+  brand          String
+  modelName      String
+  defaultCpu     String?
+  defaultRam     String?
+  defaultStorage String?
+  defaultScreen  String?
+  defaultGpu     String?
+  note           String?
+  modelCode      String?       @unique
+  // Tag cấu hình ở Cài đặt > Tag Model (gán hàng loạt). OK = thiết bị model
+  // này cấp phát được bình thường, BACKUP = thiết bị model này chỉ dùng làm
+  // máy dự phòng/backup. Đặt trên Model (không phải từng Asset) vì đây là
+  // thuộc tính của DÒNG SẢN PHẨM, áp dụng chung cho mọi thiết bị cùng model
+  // — không cần gắn tay lại cho từng máy lẻ.
+  // @default(OK): mặc định mọi model MỚI tạo đều là "cấp phát được" trừ khi
+  // Admin chủ động đổi sang Backup hoặc bỏ tag (chọn lại "— Không gắn —" ở
+  // trang Cài đặt > Tag Model để set về null nếu cần). Migration
+  // 20260829124029_asset_model_tag_default_ok đã backfill toàn bộ model cũ
+  // (đang null) sang OK cùng lúc set default này.
+  tag            AssetModelTag? @default(OK)
+  assets         Asset[]
+  category       AssetCategory @relation(fields: [categoryId], references: [id])
+
+  @@unique([brand, modelName])
+  @@index([categoryId])
+  @@index([brand])
+  @@index([modelName])
+  @@index([tag])
+}
+
+model Asset {
+  id                Int               @id @default(autoincrement())
+  assetTag          String            @unique
+  serialNumber      String            @unique
+  modelId           Int
+  actualCpu         String?
+  actualRam         String?
+  actualStorage     String?
+  actualScreen      String?
+  actualGpu         String?
+  color             String?
+  condition         String?
+  note              String?
+  status            AssetStatus       @default(IN_STOCK)
+  warehouseId       Int?
+  currentEmployeeId Int?
+  purchaseDate      DateTime?
+  // Chỉ có giá trị khi status=RETIRED VÀ đã được xác nhận xử lý xong (bán/
+  // huỷ thật sự) — null nghĩa là đang "Chờ thanh lý" (đã đánh dấu nhưng vẫn
+  // còn nằm vật lý trong kho chờ xử lý). Có giá trị nghĩa là "Đã thanh lý".
+  // Tách bằng field riêng thay vì thêm status mới để không phải sửa lại toàn
+  // bộ chỗ đang so sánh AssetStatus.RETIRED (dropdown filter, StatusBadge...).
+  // liquidatedBy lưu thẳng trên Asset (không đọc lại từ AssetHistory) để
+  // tránh nhầm với dòng lịch sử "Chờ thanh lý" ban đầu khi hiển thị bảng.
+  liquidatedAt      DateTime?
+  liquidatedBy      String?
+  // Loại cấp phát của lần bàn giao ĐANG HIỆU LỰC (null = chưa từng cấp phát
+  // qua luồng có chọn loại, hoặc thiết bị không còn ai giữ — xem
+  // returnAssetAction/bulkReturnAssetsAction, luôn set về null khi thu hồi).
+  // assignmentDueAt chỉ có giá trị với LOAN/WARRANTY_HOLD (PERMANENT luôn
+  // null vì không có hạn) — tính sẵn lúc bàn giao (assignedAt + 60/30 ngày)
+  // để truy vấn "sắp/đã quá hạn" ở trang /assets/loans không cần tính lại mỗi
+  // lần load.
+  assignmentType    AssignmentType?
+  assignmentDueAt   DateTime?
+  // Lượt luân chuyển kho đang CHỜ IT kho đích xác nhận (null = không có
+  // lượt nào đang chờ). warehouseId ở trên vẫn giữ nguyên là kho NGUỒN suốt
+  // thời gian chờ — chỉ đổi hẳn sang pendingTransferToWarehouseId khi
+  // confirmWarehouseTransferAction chạy; nếu bị rejectWarehouseTransferAction
+  // từ chối thì các field này bị xoá, asset về lại status cũ, không đổi
+  // warehouseId. pendingTransferPreviousStatus lưu status THẬT trước khi
+  // chuyển sang IN_TRANSIT (IN_STOCK hoặc ASSIGNED — luân chuyển áp dụng cho
+  // mọi trạng thái) để khôi phục đúng lúc xác nhận/từ chối, không mặc định
+  // cứng về IN_STOCK.
+  pendingTransferToWarehouseId   Int?
+  pendingTransferPreviousStatus  AssetStatus?
+  pendingTransferAt              DateTime?
+  pendingTransferBy              String?
+  pendingTransferNote            String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  currentEmployee   Employee?         @relation(fields: [currentEmployeeId], references: [id])
+  model             AssetModel        @relation(fields: [modelId], references: [id])
+  warehouse         Warehouse?        @relation(fields: [warehouseId], references: [id])
+  pendingTransferToWarehouse Warehouse? @relation("AssetPendingTransfer", fields: [pendingTransferToWarehouseId], references: [id])
+  accessories       AssetAccessory[]
+  assignments       AssetAssignment[]
+  histories         AssetHistory[]
+  warranties        AssetWarranty[]
+  stockInItems      StockInItem[]
+  stockOutItems     StockOutItem[]
+  repairFollowUps   RepairFollowUp[]
+
+  @@index([assetTag])
+  @@index([serialNumber])
+  @@index([status])
+  @@index([warehouseId])
+  @@index([pendingTransferToWarehouseId])
+  @@index([currentEmployeeId])
+  @@index([modelId])
+  @@index([assignmentDueAt])
+}
+
+model StockInSlip {
+  id          Int           @id @default(autoincrement())
+  slipNo      String        @unique
+  stockInDate DateTime
+  stockInType StockInType
+  vendorName  String?
+  warehouseId Int?
+  note        String?
+  createdBy   String?
+  createdAt   DateTime      @default(now())
+  items       StockInItem[]
+
+  @@index([stockInDate])
+  @@index([slipNo])
+}
+
+model StockInItem {
+  id            Int         @id @default(autoincrement())
+  stockInSlipId Int
+  assetId       Int
+  note          String?
+  asset         Asset       @relation(fields: [assetId], references: [id])
+  stockInSlip   StockInSlip @relation(fields: [stockInSlipId], references: [id])
+
+  @@unique([stockInSlipId, assetId])
+  @@index([assetId])
+}
+
+model StockOutSlip {
+  id           Int            @id @default(autoincrement())
+  slipNo       String         @unique
+  stockOutDate DateTime
+  employeeId   Int
+  note         String?
+  createdBy    String?
+  createdAt    DateTime       @default(now())
+  items        StockOutItem[]
+
+  @@index([stockOutDate])
+  @@index([slipNo])
+  @@index([employeeId])
+}
+
+model StockOutItem {
+  id             Int          @id @default(autoincrement())
+  stockOutSlipId Int
+  assetId        Int
+  note           String?
+  asset          Asset        @relation(fields: [assetId], references: [id])
+  stockOutSlip   StockOutSlip @relation(fields: [stockOutSlipId], references: [id])
+
+  @@unique([stockOutSlipId, assetId])
+  @@index([assetId])
+}
+
+// Ghi nhận "hướng xử lý" IT điền cho 1 thiết bị đang sửa chữa/bảo hành
+// (status REPAIR) đã QUÁ HẠN (xem OVERDUE_DAYS_THRESHOLD trong
+// asset.helpers.ts) khi chưa thể xử lý dứt điểm (sửa xong/thanh lý) ngay —
+// bắt buộc điền qua banner cảnh báo hiển thị ở mọi trang cho IT phụ trách
+// đúng kho đó (xem RepairFollowUpBanner trong AppLayout.tsx +
+// submitRepairFollowUpAction), không chặn hẳn các thao tác khác trong lúc
+// chưa điền, chỉ nhắc liên tục. Bản ghi mới nhất còn "hiệu lực" trong
+// OVERDUE_DAYS_THRESHOLD ngày kể từ lúc điền (xem getAssetsInRepair) — quá
+// mốc đó mà thiết bị vẫn còn ở trạng thái sửa chữa thì lại bị nhắc điền
+// tiếp, không phải điền 1 lần duy nhất là xong mãi mãi.
+// Không FK cứng sang User (giống cách AssetHistory.createdBy lưu dạng
+// String thay vì quan hệ) — user bị xoá sau này không kéo theo lỗi ràng
+// buộc hoặc mất log.
+model RepairFollowUp {
+  id        Int      @id @default(autoincrement())
+  assetId   Int
+  note      String
+  createdBy String
+  createdAt DateTime @default(now())
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@index([createdAt])
+}
+
+model AssetHistory {
+  id              Int            @id @default(autoincrement())
+  assetId         Int
+  action          HistoryAction
+  fromEmployeeId  Int?
+  toEmployeeId    Int?
+  fromWarehouseId Int?
+  toWarehouseId   Int?
+  // Snapshot Loại cấp phát (Cấp nhân viên mới/Cấp mượn/Cấp tạm chờ bảo
+  // hành/Cấp đổi thiết bị) TẠI THỜI ĐIỂM bàn giao — chỉ set cho dòng
+  // action=TRANSFER lúc cấp phát (assignAssetAction/assignAdditionalAssetAction).
+  // Cố tình KHÔNG suy từ Asset.assignmentType hiện tại lúc đọc báo cáo, vì
+  // đó chỉ phản ánh lượt cấp GẦN NHẤT — 1 thiết bị đổi tay nhiều lần trong kỳ
+  // báo cáo (thu hồi rồi cấp lại loại khác) sẽ bị báo sai loại cho các lượt
+  // cấp cũ hơn nếu đọc theo Asset. Dùng để thống kê "SL theo loại phiếu" ở
+  // trang Báo cáo (report.service.ts getIssuedReport).
+  assignmentType  AssignmentType?
+  note            String?
+  createdBy       String?
+  createdAt       DateTime       @default(now())
+  asset           Asset          @relation(fields: [assetId], references: [id])
+
+  @@index([assetId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model AssetAssignment {
+  id         Int       @id @default(autoincrement())
+  assetId    Int
+  employeeId Int
+  assignedAt DateTime  @default(now())
+  returnedAt DateTime?
+  assignedBy String?
+  note       String?
+  createdAt  DateTime  @default(now())
+  asset      Asset     @relation(fields: [assetId], references: [id])
+  employee   Employee  @relation(fields: [employeeId], references: [id])
+
+  @@index([assetId])
+  @@index([employeeId])
+  @@index([assignedAt])
+}
+
+model AssetAccessory {
+  id        Int      @id @default(autoincrement())
+  assetId   Int
+  name      String
+  quantity  Int      @default(1)
+  note      String?
+  createdAt DateTime @default(now())
+  asset     Asset    @relation(fields: [assetId], references: [id])
+
+  @@index([assetId])
+  @@index([name])
+}
+
+// "Kho vật tư" — hàng tiêu hao mua theo lô (cáp sạc, adapter, chuột, bàn
+// phím, ốc vít...), KHÔNG có serial number riêng như Asset, quản lý theo số
+// lượng tồn kho. Cố tình KHÔNG gắn vào model Warehouse (vốn dùng cho vị trí
+// của Asset serialized) để tránh lẫn 2 khái niệm khác nhau — toàn bộ module
+// này tự thân đã là "kho vật tư".
+model Supply {
+  id           Int                 @id @default(autoincrement())
+  code         String              @unique
+  name         String
+  unit         String
+  quantity     Int                 @default(0)
+  minQuantity  Int                 @default(0)
+  note         String?
+  warehouseId  Int?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  warehouse    Warehouse?          @relation(fields: [warehouseId], references: [id])
+  transactions SupplyTransaction[]
+
+  @@index([code])
+  @@index([name])
+  @@index([warehouseId])
+}
+
+// Lịch sử nhập/xuất/điều chỉnh — mirror AssetHistory, dùng làm audit trail vì
+// Supply.quantity là số tổng hợp, không tự nó giải thích được thay đổi.
+model SupplyTransaction {
+  id        Int                   @id @default(autoincrement())
+  supplyId  Int
+  type      SupplyTransactionType
+  quantity  Int
+  note      String?
+  createdBy String?
+  createdAt DateTime              @default(now())
+  supply    Supply                @relation(fields: [supplyId], references: [id])
+
+  @@index([supplyId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+enum SupplyTransactionType {
+  STOCK_IN
+  STOCK_OUT
+  ADJUST
+}
+
+model AssetWarranty {
+  id        Int       @id @default(autoincrement())
+  assetId   Int
+  provider  String?
+  startDate DateTime?
+  endDate   DateTime?
+  note      String?
+  createdAt DateTime  @default(now())
+  asset     Asset     @relation(fields: [assetId], references: [id])
+
+  @@index([assetId])
+  @@index([endDate])
+}
+
+// Nhật ký MỌI lần thử đăng nhập (thành công lẫn thất bại) — ghi ở
+// login/actions.ts, nơi đã có sẵn IP thật (từ header do server-with-ip-whitelist.js
+// gán) và kết quả rate-limit. Không liên kết cứng tới User.id vì lần đăng
+// nhập sai thường gõ nhầm username không tồn tại — lưu chuỗi username thô để
+// không mất dữ liệu debug (VD phát hiện brute-force nhắm vào 1 username lạ).
+model LoginAttempt {
+  id        Int      @id @default(autoincrement())
+  username  String
+  ip        String
+  success   Boolean
+  // "invalid_credentials" | "rate_limited" | null (null khi success = true)
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([username])
+  @@index([ip])
+  @@index([createdAt])
+}
+
+// Audit trail cho các thao tác NHẠY CẢM ngoài phạm vi tài sản (đã có
+// AssetHistory riêng) — quản lý tài khoản, whitelist IP, bật/tắt tính năng,
+// gộp/xoá Model. actorName lưu chuỗi (không FK tới User) để log không biến
+// mất nếu tài khoản thực hiện sau này bị xoá.
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorName  String
+  action     String
+  targetType String?
+  targetId   String?
+  detail     String?
+  createdAt  DateTime @default(now())
+
+  @@index([action])
+  @@index([createdAt])
+}
+
+// Nhật ký các lần máy backup ngoài (VD: Mac ở nhà/văn phòng, xem
+// scripts/backup-pull-to-mac.sh) tự kéo file backup .sql.gz.enc về máy nó —
+// máy backup tự POST lên /api/backup-pull/report (xác thực bằng
+// BACKUP_PULL_REPORT_TOKEN, xem .env.production.example) sau mỗi lần chạy,
+// dù thành công hay lỗi. Admin xem lại trong Cài đặt > Backup & Restore để
+// biết máy backup có đang chạy đều đặn hằng ngày không — "source" để sau
+// này có nhiều máy backup khác nhau vẫn phân biệt được máy nào báo cáo.
+model BackupPullLog {
+  id        Int      @id @default(autoincrement())
+  source    String
+  status    String // "success" | "error"
+  fileCount Int?
+  message   String?
+  createdAt DateTime @default(now())
+
+  @@index([source])
+  @@index([createdAt])
+}
+
+model MasterOption {
+  id        Int      @id @default(autoincrement())
+  type      String
+  value     String
+  createdAt DateTime @default(now())
+
+  @@unique([type, value])
+  @@index([type])
+}
+
+// Danh sách IP/dải IP (CIDR) được phép truy cập TOÀN BỘ hệ thống khi bật
+// whitelist. Việc CHẶN thật sự không nằm trong Next.js (middleware chạy
+// Edge runtime không gọi được Prisma) mà nằm ở custom server (server.js ở
+// gốc repo) — bảng này chỉ là nơi lưu cấu hình, custom server tự cache lại
+// trong bộ nhớ và refresh định kỳ, không query DB trên từng request.
+model IpWhitelistEntry {
+  id          Int      @id @default(autoincrement())
+  // 1 địa chỉ IPv4 đơn ("1.2.3.4"), 1 dải CIDR IPv4 ("1.2.3.0/24"), hoặc 1
+  // địa chỉ IPv6 đơn — xem ghi chú trong src/lib/ip-whitelist.ts về giới hạn
+  // (chưa hỗ trợ CIDR cho IPv6).
+  cidr        String   @unique
+  description String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+}
+
+// Bảng chỉ có đúng 1 dòng (id cố định = 1) — bật/tắt việc chặn IP tách biệt
+// khỏi danh sách entry, để Admin có thể thêm/kiểm tra IP của mình trước rồi
+// mới bật, tránh tự khoá mình ra khỏi hệ thống.
+model IpWhitelistConfig {
+  id        Int      @id @default(1)
+  enabled   Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+// Bảng chỉ có đúng 1 dòng (id cố định = 1) — bật/tắt tính năng Import Excel
+// (Cài đặt > Import Excel). Mặc định BẬT (default true) để không đổi hành
+// vi hiện tại của hệ thống khi migration này chạy lần đầu; Admin tự tắt khi
+// cần (VD: tạm khoá trong lúc dọn dữ liệu, tránh lặp lại sự cố import nhầm
+// file như đã từng gặp trên VPS).
+model ImportSettings {
+  id        Int      @id @default(1)
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+enum AssetStatus {
+  IN_STOCK
+  ASSIGNED
+  REPAIR
+  RETIRED
+  LOST
+  // Đang trong lượt luân chuyển kho, đã được kho nguồn gửi đi nhưng CHƯA
+  // được IT kho đích bấm "Xác nhận nhập kho" — xem các field pendingTransfer*
+  // trên Asset + transferWarehouseAction/confirmWarehouseTransferAction/
+  // rejectWarehouseTransferAction. Cố tình làm 1 status THẬT (không dùng
+  // field phụ như cách RETIRED/liquidatedAt đã làm) vì mục tiêu là thiết bị
+  // KHÔNG được tính vào tồn kho của bất kỳ kho nào trong lúc chờ — dùng
+  // status riêng thì mọi chỗ đang lọc theo IN_STOCK/ASSIGNED (Dashboard,
+  // Báo cáo, danh sách Tài sản...) tự động loại trừ đúng thiết bị này mà
+  // không phải sửa lại từng nơi.
+  IN_TRANSIT
+}
+
+enum StockInType {
+  NEW_PURCHASE
+  RETURNED
+}
+
+enum HistoryAction {
+  STOCK_IN
+  STOCK_OUT
+  RETURN
+  TRANSFER
+  UPDATE
+  REPAIR
+  RETIRE
+  // Luân chuyển thiết bị từ kho này sang kho khác — tách riêng khỏi TRANSFER
+  // (vốn dùng cho bàn giao/chuyển GIỮA CÁC NHÂN VIÊN) để Timeline không hiển
+  // thị nhầm hành động đổi kho thành "Bàn giao".
+  WAREHOUSE_TRANSFER
+}
+
+// Loại cấp phát khi bàn giao thiết bị cho nhân viên — quyết định thiết bị có
+// bị tính "đến hạn" cần cảnh báo hay không (xem Asset.assignmentDueAt và
+// ASSIGNMENT_WARNING_DAYS trong asset.helpers.ts). "Cấp mượn"/"Cấp tạm chờ
+// bảo hành" là tạm thời, có mốc thời gian nên phải nhắc để thu hồi lại đúng
+// hạn; "Cấp nhân viên mới" là lâu dài (thiết bị chính thức của nhân viên đó),
+// không có hạn nên không cảnh báo.
+enum AssignmentType {
+  PERMANENT
+  LOAN
+  WARRANTY_HOLD
+  // Cấp đổi thiết bị — bàn giao 1 thiết bị mới để đổi lấy đúng 1 thiết bị
+  // nhân viên đang giữ (thu hồi ngay thiết bị cũ trong cùng thao tác). Xem
+  // logic đổi máy ở assignAssetAction/assignAdditionalAssetAction — không có
+  // hạn cảnh báo (giống PERMANENT, không nằm trong ASSIGNMENT_WARNING_DAYS)
+  // vì thiết bị mới thay thế coi như chính thức của nhân viên đó luôn.
+  EXCHANGE
+}
+
+// Tag gắn cho AssetModel ở Cài đặt > Tag Model — xem ghi chú đầy đủ ở field
+// AssetModel.tag.
+enum AssetModelTag {
+  OK
+  BACKUP
+}

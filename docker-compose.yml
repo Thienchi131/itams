@@ -1,0 +1,82 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: itams_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: itams_db
+    volumes:
+      - itams_db_data:/var/lib/postgresql/data
+    # Bỏ comment dòng dưới nếu cần truy cập DB từ ngoài VPS (VD: pgAdmin từ xa).
+    # ports:
+    #   - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U itams_user -d itams_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # no-new-privileges: chặn tiến trình bên trong container tự nâng quyền
+    # qua binary setuid/setgid (kể cả khi bị chiếm quyền thực thi lệnh) — an
+    # toàn tuyệt đối, không ảnh hưởng gì tới cách postgres tự hạ quyền từ
+    # root xuống user "postgres" lúc khởi động (dùng setuid() trực tiếp từ
+    # process root, không qua binary setuid nào, nên KHÔNG bị chặn bởi cờ
+    # này). CỐ TÌNH KHÔNG thêm "cap_drop: ALL" ở đây như service "app" bên
+    # dưới — ảnh postgres chính thức cần vài capability (CAP_CHOWN,
+    # CAP_SETUID...) cho bước chown data dir lúc khởi động lần đầu, xoá hết
+    # có rủi ro làm DB không khởi động lại được sau lần deploy tới mà không
+    # kiểm chứng trực tiếp được trên VPS.
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://itams_user:${POSTGRES_PASSWORD}@db:5432/itams_db
+    ports:
+      # Chỉ bind localhost — Nginx trên host reverse-proxy vào đây. Trước đây
+      # bind "3000:3000" (mọi interface) khiến cổng 3000 lộ thẳng ra internet
+      # và bỏ qua hoàn toàn rule ufw (Docker tự thêm iptables riêng, không đi
+      # qua ufw), ai cũng truy cập thẳng IP:3000 được mà không qua whitelist
+      # IP hay Nginx. Bind 127.0.0.1 buộc mọi truy cập phải qua Nginx trước.
+      - "127.0.0.1:3000:3000"
+    volumes:
+      # Bind-mount ra thư mục backups/ ngay trên VPS (~/itams/backups) — cùng
+      # thư mục mà scripts/backup-db.sh (chạy qua cron trên host) đã dùng từ
+      # trước, nên tính năng Backup/Restore trong Cài đặt và cron script nhìn
+      # thấy chung 1 danh sách file. LƯU Ý: sau khi kéo bản này về VPS lần
+      # đầu, cần chạy 1 lần: `mkdir -p ~/itams/backups && chmod -R a+rwX
+      # ~/itams/backups` — vì container "app" chạy bằng user "nextjs" (uid
+      # 1001), khác user "it-hd" sở hữu thư mục trên host, nếu không nới
+      # quyền thì app không tạo/xoá file backup được (403/EACCES).
+      - ./backups:/app/backups
+    # App Node.js/Next.js không cần BẤT KỲ Linux capability đặc quyền nào để
+    # chạy bình thường (không mở cổng <1024, không đổi owner file, không
+    # đụng network interface...) — chạy sẵn bằng user "nextjs" không phải
+    # root (xem Dockerfile) nên xoá hết capability + chặn tự nâng quyền
+    # (no-new-privileges) không ảnh hưởng gì tới hoạt động thật, chỉ thu hẹp
+    # thêm khả năng khai thác NẾU lỡ có lỗ hổng code-execution nào đó trong
+    # tương lai (defense in depth).
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  itams_db_data:
