@@ -355,7 +355,7 @@ export default async function Home({
   return (
     <AppLayout hideTopbar>
       {/* Hero */}
-      <div className="mb-5 flex items-center gap-5 rounded-3xl bg-gradient-to-br from-[#dceafd] via-[#eaf3ff] to-[#f7fbff] p-8">
+      <div className="mb-5 flex flex-col items-start gap-4 rounded-3xl bg-gradient-to-br from-[#dceafd] via-[#eaf3ff] to-[#f7fbff] p-5 sm:flex-row sm:items-center sm:gap-5 sm:p-8">
         {/* eslint-disable-next-line @next/next/no-img-element -- ảnh tĩnh
             trong public/, không cần qua pipeline tối ưu ảnh của Next (đỡ
             phụ thuộc "sharp" lúc chạy trong Docker image). */}
@@ -368,7 +368,7 @@ export default async function Home({
         />
 
         <div className="min-w-0 flex-1">
-          <h2 className="text-2xl font-bold text-slate-900">
+          <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
             Xin chào, {currentUser.fullName}! 👋
           </h2>
           <p className="mt-1 text-sm text-slate-500">
@@ -377,7 +377,7 @@ export default async function Home({
           </p>
         </div>
 
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex w-full items-center gap-3 sm:w-auto sm:shrink-0">
           {(!isScoped || allRegions.some((r) => r.warehouses.length > 1)) && (
             <WarehouseFilterSelect
               regions={allRegions}
@@ -391,7 +391,7 @@ export default async function Home({
         </div>
       </div>
 
-      <div className="mb-5 grid grid-cols-6 gap-4">
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-6">
         <DashboardCard
           icon={<Monitor size={20} />}
           label="Tổng tài sản tồn kho"
@@ -462,8 +462,8 @@ export default async function Home({
           chiều cao được LẤP ĐẦY bởi chính khung border/nền trắng thay vì để
           trống, và nếu dữ liệu bên trái (10 dòng) vẫn dài hơn khung phải thì
           tự cuộn riêng bên trong, không đẩy khung phải cao theo. */}
-      <div className="mb-5 grid grid-cols-3 items-stretch gap-4">
-        <div className="col-span-2 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="mb-5 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
+        <div className="flex min-w-0 flex-col overflow-hidden rounded-2xl lg:col-span-2 border border-slate-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 p-4">
             <div className="flex items-center gap-2.5">
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
@@ -480,8 +480,8 @@ export default async function Home({
             </Link>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
-          <table className="w-full text-sm">
+          <div className="min-h-0 flex-1 overflow-auto">
+          <table className="w-full min-w-[560px] text-sm">
             <thead className="bg-slate-50 text-xs text-slate-500">
               <tr>
                 <th className="p-3 text-left">Asset Tag</th>
@@ -527,7 +527,7 @@ export default async function Home({
         <WarehouseChart total={totalAssets} data={warehouseData} />
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <AlertProgressCard
           href="/employees"
           icon={<Users size={18} />}
@@ -594,7 +594,7 @@ function DashboardCard({ icon, label, value, color, href }: any) {
       </div>
       <div className="min-w-0">
         <div className="text-xl font-bold text-slate-900">{value}</div>
-        <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">{label}</p>
+        <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-snug text-slate-500 xl:truncate">{label}</p>
       </div>
     </>
   );

@@ -31,7 +31,7 @@ export default async function ActivityPage({
   return (
     <AppLayout>
       <div className="mb-6">
-        <h2 className="text-3xl font-bold text-slate-900">Lịch sử thay đổi</h2>
+        <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Lịch sử thay đổi</h2>
         <p className="mt-1 text-slate-500">
           Toàn bộ <span className="font-bold text-slate-900">{total}</span>{" "}
           thay đổi thiết bị trên hệ thống

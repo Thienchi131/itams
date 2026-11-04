@@ -44,7 +44,7 @@ export default async function SetupTwoFactorPage({
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
       <div className="w-full max-w-lg rounded-2xl border bg-white p-8 shadow-sm">
-        <h1 className="text-3xl font-bold text-slate-900">
+        <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
           Thiết lập xác thực 2 lớp
         </h1>
         <p className="mt-2 text-slate-500">

@@ -114,7 +114,7 @@ export default function EmployeeAssetsPanel({
 
   return (
     <>
-      <section className="col-span-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-2xl lg:col-span-2 border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-6">
           <div>
             <h2 className="text-xl font-bold text-slate-900">

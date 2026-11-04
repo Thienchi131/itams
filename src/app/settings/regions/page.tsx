@@ -39,7 +39,7 @@ export default async function RegionsSettingsPage({
         Quay lại Quản lý kho
       </Link>
 
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Quản lý khu vực</h2>
           <p className="mt-1 text-sm text-slate-500">

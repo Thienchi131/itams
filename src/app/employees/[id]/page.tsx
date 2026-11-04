@@ -67,7 +67,7 @@ export default async function EmployeeDetailPage({
           <ArrowLeft size={16} />
           Quay lại
         </Link>
-<div className="flex items-center justify-between">
+<div className="flex flex-wrap items-center justify-between gap-3">
   <div className="flex items-center gap-5">
     <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-blue-100 text-blue-600">
       <UserRound size={38} />
@@ -101,7 +101,7 @@ export default async function EmployeeDetailPage({
   )}
 </div>
 
-        <div className="grid grid-cols-4 gap-5">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-5">
           <SummaryCard
             icon={<Mail />}
             label="Email"
@@ -131,7 +131,7 @@ export default async function EmployeeDetailPage({
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 text-xl font-bold text-slate-900">
               Thông tin nhân viên
@@ -164,7 +164,7 @@ export default async function EmployeeDetailPage({
               )}
             />
           ) : (
-            <section className="col-span-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <section className="overflow-hidden rounded-2xl lg:col-span-2 border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-100 p-6">
                 <h2 className="text-xl font-bold text-slate-900">
                   Thiết bị đang giữ
@@ -244,7 +244,7 @@ export default async function EmployeeDetailPage({
           <div className="relative border-l-2 border-slate-200 pl-6">
             <div className="absolute -left-[7px] top-1 h-3 w-3 rounded-full bg-emerald-500" />
 
-            <div className="grid grid-cols-4 gap-6 text-sm">
+            <div className="grid grid-cols-2 gap-4 text-sm lg:grid-cols-4 lg:gap-6">
               <div>
                 <p className="font-bold text-slate-900">
                   <BadgeCheck className="mr-2 inline h-4 w-4 text-emerald-500" />

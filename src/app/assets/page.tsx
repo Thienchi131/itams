@@ -263,9 +263,9 @@ export default async function AssetsPage({
         </div>
       )}
 
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-bold text-slate-900">Quản lý tài sản</h2>
+          <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Quản lý tài sản</h2>
           <p className="mt-1 text-slate-500">
             Tổng cộng <span className="font-bold text-slate-900">{total}</span> thiết bị
           </p>

@@ -27,3 +27,19 @@ body {
 .input-style {
   @apply w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100;
 }
+/* Màn hình hẹp (< 1024px, cùng mốc thu gọn sidebar ở AppLayout): bảng dữ
+   liệu cuộn ngang thay vì bị bóp cột thành chữ dọc. Áp chung cho mọi bảng
+   trong vùng nội dung để không phải bọc từng bảng một. */
+@media (max-width: 1023px) {
+  main section table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  main section table th,
+  main section table td {
+    white-space: nowrap;
+  }
+}

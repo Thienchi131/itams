@@ -25,7 +25,7 @@ export default async function NewUserPage() {
   return (
     <AppLayout>
       <div className="mb-8">
-        <h2 className="text-3xl font-bold text-slate-900">
+        <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
           Thêm User
         </h2>
 

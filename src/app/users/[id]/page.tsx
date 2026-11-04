@@ -45,7 +45,7 @@ export default async function UserDetailPage({
           Quay lại
         </Link>
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-5">
             <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-blue-100 text-blue-600">
               <UserCircle2 size={42} />
@@ -87,7 +87,7 @@ export default async function UserDetailPage({
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-5">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-5">
           <SummaryCard
             icon={<UserCircle2 />}
             label="Username"

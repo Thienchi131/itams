@@ -31,7 +31,7 @@ export default async function VerifyTwoFactorPage({
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
       <div className="w-full max-w-md rounded-2xl border bg-white p-8 shadow-sm">
-        <h1 className="text-3xl font-bold text-slate-900">Xác thực 2 lớp</h1>
+        <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Xác thực 2 lớp</h1>
         <p className="mt-2 text-slate-500">
           Nhập mã 6 số hiện trên app Google Authenticator của{" "}
           <span className="font-semibold">{user.fullName}</span>.

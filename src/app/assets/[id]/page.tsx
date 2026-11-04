@@ -215,7 +215,7 @@ Thiết bị đã được tiếp nhận về kho.`;
           Quay lại
         </Link>
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-5">
             <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-blue-100 text-blue-600">
               <Laptop size={38} />
@@ -251,7 +251,7 @@ Thiết bị đã được tiếp nhận về kho.`;
           </div>
         </div>
 
-        <section className="grid grid-cols-6 overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="grid grid-cols-2 gap-4 overflow-hidden rounded-2xl sm:grid-cols-3 lg:grid-cols-6 lg:gap-0 border border-slate-200 bg-white p-5 shadow-sm">
           <TopInfo
             label="Loại thiết bị"
             value={asset.model.category.name}
@@ -320,8 +320,8 @@ Thiết bị đã được tiếp nhận về kho.`;
           />
         </section>
 
-        <div className="grid grid-cols-3 gap-5">
-          <div className="col-span-2 grid grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:col-span-2">
             <Panel title="Thông tin thiết bị">
               <InfoRow
                 icon={<BadgeCheck />}
@@ -735,7 +735,7 @@ Thiết bị đã được tiếp nhận về kho.`;
         </div>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-5 flex items-center justify-between">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-lg font-bold text-slate-900">Timeline</h3>
 
             <Link
@@ -815,7 +815,7 @@ Thiết bị đã được tiếp nhận về kho.`;
                   >
                     <div className="absolute -left-[7px] top-1 h-3 w-3 rounded-full bg-emerald-500" />
 
-                    <div className="grid grid-cols-5 gap-6">
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5 lg:gap-6">
                       <div>
                         <p className="font-bold text-slate-900">
                           {getHistoryActionLabel(history.action)}
@@ -981,7 +981,7 @@ function ActionCard({
 
   return (
     <div className="mb-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm last:mb-0">
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-4">
           <div
             className={`flex h-12 w-12 items-center justify-center rounded-xl text-white ${theme[color]}`}

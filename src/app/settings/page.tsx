@@ -26,13 +26,13 @@ export default async function SettingsPage() {
   return (
     <AppLayout>
       <div className="mb-6">
-        <h2 className="text-3xl font-bold text-slate-900">Cài đặt</h2>
+        <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Cài đặt</h2>
         <p className="mt-1 text-slate-500">
           Cấu hình hệ thống IT Asset Management
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
         <SettingCard
           icon={<Warehouse />}
           title="Kho"

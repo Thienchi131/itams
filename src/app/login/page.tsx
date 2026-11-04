@@ -107,7 +107,7 @@ export default async function LoginPage({
             <ChevronDown size={12} />
           </div>
 
-          <h2 className="text-3xl font-bold text-slate-900">
+          <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
             Chào mừng trở lại! 👋
           </h2>
           <p className="mt-2 text-slate-500">

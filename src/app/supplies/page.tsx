@@ -95,9 +95,9 @@ export default async function SuppliesPage({
         </div>
       )}
 
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-bold text-slate-900">Vật tư</h2>
+          <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Vật tư</h2>
           <p className="mt-1 text-slate-500">
             Hàng tiêu hao tính theo số lượng (cáp sạc, adapter, chuột, bàn phím...)
             {lowStockCount > 0 && (

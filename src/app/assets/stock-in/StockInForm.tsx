@@ -654,7 +654,7 @@ export default function StockInForm({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                   <InfoBox icon={<Cpu />} label="CPU" value={selectedModel.defaultCpu ?? "-"} />
                   <InfoBox icon={<HardDrive />} label="RAM" value={selectedModel.defaultRam ?? "-"} />
                   <InfoBox icon={<HardDrive />} label="SSD" value={selectedModel.defaultStorage ?? "-"} />
