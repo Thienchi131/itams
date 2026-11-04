@@ -14,6 +14,8 @@ export function middleware(request: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
     pathname === "/favicon.ico" ||
+    // Manifest PWA: iPhone/Android tải file này khi "Thêm vào MH chính".
+    pathname === "/manifest.webmanifest" ||
     // Ảnh tĩnh trong public/ (logo, mascot...) phải tải được kể cả khi CHƯA
     // đăng nhập — VD trang /login hiển thị hình con gà, nếu chặn thì trình
     // duyệt sẽ bị redirect về /login và nhận nhầm HTML thay vì ảnh (hiện icon

@@ -75,7 +75,9 @@ export default async function AssetDetailPage({
   const { id } = await params;
   const { returnTo: returnToParam } = await searchParams;
   const backHref =
-    returnToParam && returnToParam.startsWith("/assets") ? returnToParam : "/assets";
+    returnToParam && (returnToParam.startsWith("/assets") || returnToParam === "/scan")
+      ? returnToParam
+      : "/assets";
 
   const currentUser = await requireLogin();
   const asset = await getAssetById(Number(id));

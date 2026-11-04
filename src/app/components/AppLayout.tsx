@@ -15,6 +15,7 @@ import {
   TriangleAlert,
   Truck,
   Menu,
+  ScanLine,
 } from "lucide-react";
 
 import { requireLogin } from "@/modules/auth/auth.service";
@@ -148,6 +149,14 @@ export default async function AppLayout({
             />
           )}
 
+          {canAccessMenu(roleName, "assets") && (
+            <AppMenuLink
+              href="/scan"
+              icon={<ScanLine size={18} />}
+              label="Quét mã thiết bị"
+            />
+          )}
+
           {canAccessMenu(roleName, "models") && (
             <AppMenuLink
               href="/models"
@@ -246,7 +255,14 @@ export default async function AppLayout({
             <Menu size={20} />
             <span className="sr-only">Mở menu</span>
           </label>
-          <span className="text-base font-bold text-slate-900">ITAMS</span>
+          <span className="flex-1 text-base font-bold text-slate-900">ITAMS</span>
+          <Link
+            href="/scan"
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-blue-600 px-3 text-sm font-bold text-white"
+          >
+            <ScanLine size={18} />
+            Quét mã
+          </Link>
         </div>
 
         {/* Banner cố định, không tự đóng được — cố tình KHÔNG có nút "x" để
