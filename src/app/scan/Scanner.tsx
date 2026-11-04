@@ -185,14 +185,21 @@ export default function Scanner() {
         className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
       >
         <label htmlFor="manual-code" className="text-sm font-semibold text-slate-700">
-          Hoặc nhập Asset Tag / Serial
+          Hoặc nhập / quét chữ Asset Tag, Serial
         </label>
+        <p className="mt-1 text-xs leading-relaxed text-slate-500">
+          Serial chỉ in chữ, không có mã vạch? Trên iPhone: chạm vào ô bên dưới, chọn{" "}
+          <b>Quét văn bản</b> (biểu tượng khung chữ trên bàn phím hoặc trong menu khi chạm
+          giữ), hướng camera vào dòng S/N rồi bấm <b>Chèn</b>.
+        </p>
         <div className="mt-2 flex gap-2">
           <input
             id="manual-code"
             value={manual}
             onChange={(e) => setManual(e.target.value)}
             autoCapitalize="characters"
+            enterKeyHint="search"
+            inputMode="text"
             autoCorrect="off"
             spellCheck={false}
             placeholder="VD: IT-031126-8543000 hoặc C02XJ0L7JG5J"

@@ -50,10 +50,18 @@ export async function lookupScannedCodeAction(raw: string): Promise<ScanLookupRe
       : { error: "Không tìm thấy thiết bị này, hoặc thiết bị nằm ngoài kho bạn được phân quyền." };
   }
 
-  const normalized = code.toUpperCase();
+  const normalized = normalizeScannedText(code);
+  if (!normalized) return { error: "Chưa có mã để tra." };
+
   const candidates = [normalized];
+  // Quét CHỮ (Live Text trên iPhone) hay nhầm O/0 và I/1 — serial Apple không
+  // dùng chữ O và I, nên thử thêm phương án đã đổi về số.
+  const digitFixed = normalized.replace(/O/g, "0").replace(/I/g, "1");
+  if (digitFixed !== normalized) candidates.push(digitFixed);
   // Mã vạch serial trên hộp Apple in dạng "S" + serial.
-  if (/^S[A-Z0-9]{10,14}$/.test(normalized)) candidates.push(normalized.slice(1));
+  for (const c of [...candidates]) {
+    if (/^S[A-Z0-9]{10,14}$/.test(c)) candidates.push(c.slice(1));
+  }
 
   const select = {
     id: true,
@@ -105,4 +113,14 @@ export async function lookupScannedCodeAction(raw: string): Promise<ScanLookupRe
       warehouse: a.warehouse ? `${a.warehouse.code} - ${a.warehouse.name}` : null,
     })),
   };
+}
+
+// Dọn chữ quét được từ nhãn máy: bỏ nhãn "S/N:", "Serial No.", "SN:"…,
+// bỏ khoảng trắng / xuống dòng mà Live Text hay chèn vào giữa serial.
+function normalizeScannedText(raw: string) {
+  let text = raw.toUpperCase().replace(/[\u200B-\u200D\uFEFF]/g, "");
+  // Nhãn phải có dấu ":" / khoảng trắng theo sau, tránh cắt nhầm serial
+  // thật bắt đầu bằng "SN…".
+  text = text.replace(/^\s*(?:SERIAL\s*(?:NO\.?|NUMBER|#)?|S\/N|SN)(?:\s*[:#.\-]\s*|\s+)/, "");
+  return text.replace(/\s+/g, "");
 }
