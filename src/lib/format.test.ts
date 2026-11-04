@@ -14,7 +14,7 @@ test("truncateSerial viết hoa serial", () => {
 test("truncateSerial giữ nguyên serial ngắn hơn hoặc bằng giới hạn", () => {
   const exact = "A".repeat(SERIAL_MAX_LENGTH);
   assert.equal(truncateSerial(exact), exact);
-  assert.equal(truncateSerial(exact).length, SERIAL_MAX_LENGTH);
+  assert.equal(truncateSerial(exact)?.length, SERIAL_MAX_LENGTH);
 });
 
 test("truncateSerial cắt bớt + thêm ... khi serial dài hơn giới hạn", () => {

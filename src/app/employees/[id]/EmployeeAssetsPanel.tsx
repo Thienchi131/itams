@@ -10,6 +10,8 @@ import {
   assignAdditionalAssetAction,
   type EmployeeActionState,
 } from "./actions";
+import ReturnWarehouseSelect from "@/app/components/ReturnWarehouseSelect";
+import type { WarehouseOption } from "@/modules/warehouse/return-destination";
 
 type AssetItem = {
   id: number;
@@ -77,11 +79,15 @@ export default function EmployeeAssetsPanel({
   assets,
   availableAssets,
   employees,
+  returnWarehouseOptions = [],
+  defaultReturnWarehouseId = null,
 }: {
   employeeId: number;
   assets: AssetItem[];
   availableAssets: AvailableAsset[];
   employees: EmployeeOption[];
+  returnWarehouseOptions?: WarehouseOption[];
+  defaultReturnWarehouseId?: number | null;
 }) {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [modal, setModal] = useState<"return" | "transfer" | "assign" | null>(
@@ -237,6 +243,8 @@ export default function EmployeeAssetsPanel({
         <ReturnModal
           employeeId={employeeId}
           assets={selectedAssets}
+          warehouseOptions={returnWarehouseOptions}
+          defaultWarehouseId={defaultReturnWarehouseId}
           onClose={() => setModal(null)}
         />
       )}
@@ -300,10 +308,14 @@ function ModalShell({
 function ReturnModal({
   employeeId,
   assets,
+  warehouseOptions,
+  defaultWarehouseId,
   onClose,
 }: {
   employeeId: number;
   assets: AssetItem[];
+  warehouseOptions: WarehouseOption[];
+  defaultWarehouseId: number | null;
   onClose: () => void;
 }) {
   const [state, formAction, isPending] = useActionState<
@@ -375,6 +387,11 @@ function ReturnModal({
             );
           })}
         </div>
+
+        <ReturnWarehouseSelect
+          options={warehouseOptions}
+          defaultWarehouseId={defaultWarehouseId}
+        />
 
         <div>
           <label className="text-sm font-medium">Lý do thu hồi</label>

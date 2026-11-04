@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { showToast } from "@/lib/flash";
 import { TriangleAlert } from "lucide-react";
 import { mergeEmployeesAction, type MergeEmployeesState } from "./merge/actions";
 
@@ -23,6 +24,11 @@ export default function MergeEmployeesForm({
     MergeEmployeesState,
     FormData
   >(mergeEmployeesAction, null);
+
+  // Action không redirect -> tự hiện toast khi trả về success.
+  useEffect(() => {
+    if (state?.success) showToast(state.success);
+  }, [state]);
 
   return (
     <form action={formAction} className="space-y-2">

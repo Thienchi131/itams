@@ -7,8 +7,15 @@ import { generateRandomPassword } from "@/lib/password";
 import { sendUserPasswordEmail } from "@/lib/mail";
 import { requireRole } from "@/modules/auth/auth.service";
 import { createAuditLog } from "@/modules/audit/audit-log.service";
+import { withFlash } from "@/lib/flash";
 
-export type CreateUserState = { error: string } | null;
+export type CreateUserState =
+  | { error: string }
+  // Tài khoản ĐÃ tạo nhưng gửi email thất bại — trả mật khẩu tạm về cho Admin
+  // tự chuyển cho user (thay vì "thành công" giả, user bị kẹt không đăng nhập
+  // được mà không ai biết mật khẩu).
+  | { created: { email: string; fullName: string; tempPassword: string } }
+  | null;
 
 export async function createUserAction(
   _prevState: CreateUserState,
@@ -94,17 +101,19 @@ export async function createUserAction(
     detail: `${fullName} (${email})`,
   });
 
-  // Không await — nếu SMTP bị chặn/chậm (rất hay gặp với VPS chặn port
-  // mail đi ra), await ở đây sẽ treo cả trang tới khi timeout. Gửi nền,
-  // lỗi chỉ log lại; tài khoản đã tạo thành công trong DB rồi nên không
-  // ảnh hưởng tới nghiệp vụ.
-  sendUserPasswordEmail({
-    to: email,
-    fullName,
-    password: plainPassword,
-  }).catch((error) => {
+  // Await việc gửi mail (transporter đã có timeout 10s) để BIẾT kết quả.
+  // Trước đây gửi kiểu "bắn rồi quên": SMTP lỗi thì chỉ ghi log, Admin vẫn
+  // thấy như thành công còn user thì không bao giờ nhận được mật khẩu.
+  try {
+    await sendUserPasswordEmail({
+      to: email,
+      fullName,
+      password: plainPassword,
+    });
+  } catch (error) {
     console.error("SEND_EMAIL_ERROR:", error);
-  });
+    return { created: { email, fullName, tempPassword: plainPassword } };
+  }
 
-  redirect("/users");
+  redirect(withFlash("/users", "user_created"));
 }

@@ -16,10 +16,16 @@ const IP_WINDOW_MS = 15 * 60 * 1000;
 const EMAIL_MAX_ATTEMPTS = 3;
 const EMAIL_WINDOW_MS = 15 * 60 * 1000;
 
-async function getBaseUrl() {
-  // Cho phép ép cứng qua APP_URL (VD: khi chạy sau reverse proxy không
-  // truyền đúng header host/proto) — mặc định tự suy ra từ chính request.
+async function getBaseUrl(): Promise<string | null> {
   if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, "");
+
+  // Production BẮT BUỘC có APP_URL: header Host do client gửi lên, nếu dựng
+  // link từ đó thì kẻ gian gửi yêu cầu với Host giả là nạn nhân nhận link trỏ
+  // về domain của kẻ gian (lộ token). Chỉ cho phép suy ra từ Host khi dev.
+  if (process.env.NODE_ENV === "production") {
+    console.error("APP_URL chưa được cấu hình — bỏ qua gửi email đặt lại mật khẩu.");
+    return null;
+  }
 
   const headerList = await headers();
   const host = headerList.get("host");
@@ -72,6 +78,7 @@ export async function requestPasswordResetAction(formData: FormData) {
     });
 
     const baseUrl = await getBaseUrl();
+    if (!baseUrl) redirect("/forgot-password?sent=1");
     const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
     // Không await — cùng lý do như các chỗ gửi email khác trong app: SMTP

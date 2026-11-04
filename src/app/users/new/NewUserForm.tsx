@@ -25,9 +25,35 @@ export default function NewUserForm({
     null
   );
 
+  if (state && "created" in state) {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900">
+        <div className="flex items-start gap-2.5">
+          <TriangleAlert size={20} className="mt-0.5 shrink-0" />
+          <div className="space-y-3 text-sm">
+            <p className="text-base font-semibold">
+              Đã tạo tài khoản cho {state.created.fullName}, nhưng gửi email thất bại.
+            </p>
+            <p>
+              Hãy chuyển mật khẩu tạm dưới đây cho <b>{state.created.email}</b> qua kênh
+              an toàn (gặp trực tiếp, tin nhắn nội bộ). Mật khẩu chỉ hiện 1 lần; người
+              dùng sẽ bị bắt đổi mật khẩu ở lần đăng nhập đầu tiên.
+            </p>
+            <p className="select-all rounded-xl border border-amber-300 bg-white px-4 py-3 font-mono text-lg tracking-wider text-slate-900">
+              {state.created.tempPassword}
+            </p>
+            <Link href="/users" className="inline-block font-semibold text-blue-700 hover:underline">
+              Về danh sách tài khoản
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form action={formAction}>
-      {state?.error && (
+      {state && "error" in state && (
         <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">
           <TriangleAlert size={18} className="mt-0.5 shrink-0" />
           <span>{state.error}</span>

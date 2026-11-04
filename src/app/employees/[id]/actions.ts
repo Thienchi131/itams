@@ -8,6 +8,8 @@ import {
   ASSIGNMENT_TYPE_LABEL,
   computeAssignmentDueAt,
 } from "@/modules/asset/asset.helpers";
+import { withFlash } from "@/lib/flash";
+import { resolveReturnWarehouse } from "@/modules/warehouse/return-destination";
 
 export type EmployeeActionState = { error: string } | null;
 
@@ -67,7 +69,17 @@ export async function bulkReturnAssetsAction(
   // kho khác kho của IT đang thao tác, xem giải thích đầy đủ ở
   // returnAssetAction (assets/[id]/actions.ts). Sau khi thu hồi, mỗi thiết
   // bị tự động "nhập kho" vào đúng kho của IT đang thực hiện.
-  const destinationWarehouseId = currentUser.warehouse?.id ?? null;
+  const destination = await resolveReturnWarehouse(
+    currentUser,
+    formData.get("returnWarehouseId"),
+    null
+  );
+
+  if ("error" in destination) {
+    return { error: destination.error };
+  }
+
+  const destinationWarehouseId = destination.id;
 
   let processedCount = 0;
 
@@ -94,8 +106,8 @@ export async function bulkReturnAssetsAction(
     const assetDestinationWarehouseId = destinationWarehouseId ?? asset.warehouseId;
 
     const warehouseChangeNote =
-      assetDestinationWarehouseId !== asset.warehouseId && currentUser.warehouse
-        ? `Nhập kho ${currentUser.warehouse.name}`
+      assetDestinationWarehouseId !== asset.warehouseId && destination.name
+        ? `Nhập kho ${destination.name}`
         : null;
 
     const note = [
@@ -166,7 +178,7 @@ export async function bulkReturnAssetsAction(
     };
   }
 
-  redirect(`/employees/${employeeId}`);
+  redirect(withFlash(`/employees/${employeeId}`, "employee_bulk_returned"));
 }
 
 /**
@@ -242,7 +254,7 @@ export async function bulkTransferAssetsAction(
     };
   }
 
-  redirect(`/employees/${employeeId}`);
+  redirect(withFlash(`/employees/${employeeId}`, "employee_bulk_transferred"));
 }
 
 /**
@@ -412,5 +424,5 @@ export async function assignAdditionalAssetAction(
     };
   }
 
-  redirect(`/employees/${employeeId}`);
+  redirect(withFlash(`/employees/${employeeId}`, "employee_asset_assigned"));
 }

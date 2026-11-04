@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/modules/auth/auth.service";
 import { redirect } from "next/navigation";
+import { withFlash } from "@/lib/flash";
 
 export async function updateEmployeeAction(formData: FormData) {
   await requireRole(["Admin", "IT"]);
@@ -109,5 +110,5 @@ export async function updateEmployeeAction(formData: FormData) {
     },
   });
 
-  redirect(`/employees/${id}`);
+  redirect(withFlash(`/employees/${id}`, "employee_updated"));
 }

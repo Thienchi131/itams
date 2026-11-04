@@ -5,6 +5,7 @@ import { requireLogin } from "@/modules/auth/auth.service";
 import { getDefaultRouteForRole } from "@/modules/auth/permissions";
 import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
+import { withFlash } from "@/lib/flash";
 
 export async function changeOwnPasswordAction(formData: FormData) {
   // skipPasswordCheck: đây chính là trang xử lý việc đổi mật khẩu, nên không
@@ -43,5 +44,5 @@ export async function changeOwnPasswordAction(formData: FormData) {
     },
   });
 
-  redirect(getDefaultRouteForRole(user.role.name));
+  redirect(withFlash(getDefaultRouteForRole(user.role.name), "own_password_changed"));
 }

@@ -3,13 +3,19 @@
 import { useActionState, useState } from "react";
 import { TriangleAlert } from "lucide-react";
 import { returnAssetAction, type AssetActionState } from "./actions";
+import ReturnWarehouseSelect from "@/app/components/ReturnWarehouseSelect";
+import type { WarehouseOption } from "@/modules/warehouse/return-destination";
 
 export default function ReturnAssetModal({
   assetId,
   returnTo,
+  warehouseOptions = [],
+  defaultWarehouseId = null,
 }: {
   assetId: number;
   returnTo?: string;
+  warehouseOptions?: WarehouseOption[];
+  defaultWarehouseId?: number | null;
 }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, isPending] = useActionState<AssetActionState, FormData>(
@@ -60,6 +66,13 @@ export default function ReturnAssetModal({
                 <option value="Thiết bị hư hỏng">Thiết bị hư hỏng</option>
                 <option value="Khác">Khác</option>
               </select>
+
+              <div className="mt-4">
+                <ReturnWarehouseSelect
+                  options={warehouseOptions}
+                  defaultWarehouseId={defaultWarehouseId}
+                />
+              </div>
 
               <label className="mt-4 block text-sm font-medium">
                 Phụ kiện đi kèm khi trả

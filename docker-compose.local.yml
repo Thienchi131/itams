@@ -1,0 +1,19 @@
+# Chỉ dùng để CHẠY THỬ TRÊN MÁY DEV — PostgreSQL riêng, cổng 5433 để không
+# đụng Postgres khác nếu máy đã có. Dữ liệu nằm trong volume itams_local_db.
+#   docker compose -f docker-compose.local.yml up -d
+#   docker compose -f docker-compose.local.yml down        # tắt (giữ data)
+#   docker compose -f docker-compose.local.yml down -v     # tắt + xoá data
+name: itams-local
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: itams_user
+      POSTGRES_PASSWORD: itams_local
+      POSTGRES_DB: itams_db
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - itams_local_db:/var/lib/postgresql/data
+volumes:
+  itams_local_db:

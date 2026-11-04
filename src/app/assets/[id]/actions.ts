@@ -5,11 +5,13 @@ import { requireRole, assertWarehouseScope } from "@/modules/auth/auth.service";
 import { AssetStatus, AssignmentType, HistoryAction } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { createAuditLog } from "@/modules/audit/audit-log.service";
+import { withFlash } from "@/lib/flash";
 import {
   ASSIGNMENT_TYPE_LABEL,
   computeAssignmentDueAt,
   REJECTED_TRANSFER_NOTE_PREFIX,
 } from "@/modules/asset/asset.helpers";
+import { resolveReturnWarehouse } from "@/modules/warehouse/return-destination";
 
 // Chấp nhận đúng các giá trị của enum AssignmentType — validate ở server
 // (không chỉ tin theo UI) phòng request bị gọi thẳng với giá trị lạ.
@@ -254,7 +256,7 @@ export async function assignAssetAction(
     }
   });
 
-  redirect(detailUrl(assetId, returnTo));
+  redirect(withFlash(detailUrl(assetId, returnTo), "asset_assigned"));
 }
 
 // Nhãn hiển thị cho 3 hướng xử lý — dùng chung giữa modal (client) và note
@@ -307,26 +309,36 @@ export async function sendToRepairAction(
     return { error: "Chỉ có thể xử lý thiết bị đang ở trạng thái Trong kho." };
   }
 
-  await prisma.asset.update({
-    where: { id: assetId },
-    data: {
-      status: isRetire ? AssetStatus.RETIRED : AssetStatus.REPAIR,
-      condition: `${categoryLabel}: ${reason}`,
-    },
+  // Transaction + điều kiện trạng thái: 2 người thao tác cùng lúc / bấm
+  // đúp thì lần sau không ghi trùng lịch sử, báo lỗi rõ ràng.
+  const changed = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.asset.updateMany({
+      where: { id: assetId, status: AssetStatus.IN_STOCK },
+      data: {
+        status: isRetire ? AssetStatus.RETIRED : AssetStatus.REPAIR,
+        condition: `${categoryLabel}: ${reason}`,
+      },
+    });
+    if (count === 0) return false;
+
+    await tx.assetHistory.create({
+      data: {
+        assetId,
+        action: isRetire ? HistoryAction.RETIRE : HistoryAction.REPAIR,
+        fromWarehouseId: asset.warehouseId,
+        toWarehouseId: asset.warehouseId,
+        note: `${categoryLabel} — ${reason}`,
+        createdBy: currentUser.fullName,
+      },
+    });
+    return true;
   });
 
-  await prisma.assetHistory.create({
-    data: {
-      assetId,
-      action: isRetire ? HistoryAction.RETIRE : HistoryAction.REPAIR,
-      fromWarehouseId: asset.warehouseId,
-      toWarehouseId: asset.warehouseId,
-      note: `${categoryLabel} — ${reason}`,
-      createdBy: currentUser.fullName,
-    },
-  });
+  if (!changed) {
+    return { error: "Trạng thái thiết bị vừa được người khác thay đổi. Vui lòng tải lại trang rồi thử lại." };
+  }
 
-  redirect(detailUrl(assetId, returnTo));
+  redirect(withFlash(detailUrl(assetId, returnTo), isRetire ? "asset_retired" : "asset_sent_repair"));
 }
 
 // Khởi tạo 1 lượt luân chuyển kho — KHÔNG còn đổi warehouseId ngay như
@@ -385,30 +397,40 @@ export async function transferWarehouseAction(
     return { error: "Kho đích không tồn tại, vui lòng chọn lại." };
   }
 
-  await prisma.asset.update({
-    where: { id: assetId },
-    data: {
-      status: AssetStatus.IN_TRANSIT,
-      pendingTransferPreviousStatus: asset.status,
-      pendingTransferToWarehouseId: toWarehouseId,
-      pendingTransferAt: new Date(),
-      pendingTransferBy: currentUser.fullName,
-      pendingTransferNote: note || null,
-    },
+  // Transaction + điều kiện trạng thái: 2 người thao tác cùng lúc / bấm
+  // đúp thì lần sau không ghi trùng lịch sử, báo lỗi rõ ràng.
+  const changed = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.asset.updateMany({
+      where: { id: assetId, status: asset.status },
+      data: {
+        status: AssetStatus.IN_TRANSIT,
+        pendingTransferPreviousStatus: asset.status,
+        pendingTransferToWarehouseId: toWarehouseId,
+        pendingTransferAt: new Date(),
+        pendingTransferBy: currentUser.fullName,
+        pendingTransferNote: note || null,
+      },
+    });
+    if (count === 0) return false;
+
+    await tx.assetHistory.create({
+      data: {
+        assetId,
+        action: HistoryAction.WAREHOUSE_TRANSFER,
+        fromWarehouseId: asset.warehouseId,
+        toWarehouseId,
+        note: `Đang chuyển đến kho, chờ xác nhận nhập kho${note ? ` — ${note}` : ""}`,
+        createdBy: currentUser.fullName,
+      },
+    });
+    return true;
   });
 
-  await prisma.assetHistory.create({
-    data: {
-      assetId,
-      action: HistoryAction.WAREHOUSE_TRANSFER,
-      fromWarehouseId: asset.warehouseId,
-      toWarehouseId,
-      note: `Đang chuyển đến kho, chờ xác nhận nhập kho${note ? ` — ${note}` : ""}`,
-      createdBy: currentUser.fullName,
-    },
-  });
+  if (!changed) {
+    return { error: "Trạng thái thiết bị vừa được người khác thay đổi. Vui lòng tải lại trang rồi thử lại." };
+  }
 
-  redirect(detailUrl(assetId, returnTo));
+  redirect(withFlash(detailUrl(assetId, returnTo), "asset_transfer_requested"));
 }
 
 // IT phụ trách kho ĐÍCH bấm "Xác nhận nhập kho" — chốt lại lượt luân chuyển:
@@ -443,31 +465,41 @@ export async function confirmWarehouseTransferAction(
 
   assertWarehouseScope(currentUser, asset.pendingTransferToWarehouseId);
 
-  await prisma.asset.update({
-    where: { id: assetId },
-    data: {
-      status: asset.pendingTransferPreviousStatus ?? AssetStatus.IN_STOCK,
-      warehouseId: asset.pendingTransferToWarehouseId,
-      pendingTransferToWarehouseId: null,
-      pendingTransferPreviousStatus: null,
-      pendingTransferAt: null,
-      pendingTransferBy: null,
-      pendingTransferNote: null,
-    },
+  // Transaction + điều kiện trạng thái: 2 người thao tác cùng lúc / bấm
+  // đúp thì lần sau không ghi trùng lịch sử, báo lỗi rõ ràng.
+  const changed = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.asset.updateMany({
+      where: { id: assetId, status: AssetStatus.IN_TRANSIT },
+      data: {
+        status: asset.pendingTransferPreviousStatus ?? AssetStatus.IN_STOCK,
+        warehouseId: asset.pendingTransferToWarehouseId,
+        pendingTransferToWarehouseId: null,
+        pendingTransferPreviousStatus: null,
+        pendingTransferAt: null,
+        pendingTransferBy: null,
+        pendingTransferNote: null,
+      },
+    });
+    if (count === 0) return false;
+
+    await tx.assetHistory.create({
+      data: {
+        assetId,
+        action: HistoryAction.WAREHOUSE_TRANSFER,
+        fromWarehouseId: asset.warehouseId,
+        toWarehouseId: asset.pendingTransferToWarehouseId,
+        note: "Đã xác nhận nhập kho",
+        createdBy: currentUser.fullName,
+      },
+    });
+    return true;
   });
 
-  await prisma.assetHistory.create({
-    data: {
-      assetId,
-      action: HistoryAction.WAREHOUSE_TRANSFER,
-      fromWarehouseId: asset.warehouseId,
-      toWarehouseId: asset.pendingTransferToWarehouseId,
-      note: "Đã xác nhận nhập kho",
-      createdBy: currentUser.fullName,
-    },
-  });
+  if (!changed) {
+    return { error: "Trạng thái thiết bị vừa được người khác thay đổi. Vui lòng tải lại trang rồi thử lại." };
+  }
 
-  redirect(detailUrl(assetId, returnTo));
+  redirect(withFlash(detailUrl(assetId, returnTo), "asset_transfer_confirmed"));
 }
 
 // IT phụ trách kho ĐÍCH từ chối nhận (VD kho nguồn chọn nhầm kho đích, hàng
@@ -508,28 +540,38 @@ export async function rejectWarehouseTransferAction(
 
   const rejectedToWarehouseId = asset.pendingTransferToWarehouseId;
 
-  await prisma.asset.update({
-    where: { id: assetId },
-    data: {
-      status: asset.pendingTransferPreviousStatus ?? AssetStatus.IN_STOCK,
-      pendingTransferToWarehouseId: null,
-      pendingTransferPreviousStatus: null,
-      pendingTransferAt: null,
-      pendingTransferBy: null,
-      pendingTransferNote: null,
-    },
+  // Transaction + điều kiện trạng thái: 2 người thao tác cùng lúc / bấm
+  // đúp thì lần sau không ghi trùng lịch sử, báo lỗi rõ ràng.
+  const changed = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.asset.updateMany({
+      where: { id: assetId, status: AssetStatus.IN_TRANSIT },
+      data: {
+        status: asset.pendingTransferPreviousStatus ?? AssetStatus.IN_STOCK,
+        pendingTransferToWarehouseId: null,
+        pendingTransferPreviousStatus: null,
+        pendingTransferAt: null,
+        pendingTransferBy: null,
+        pendingTransferNote: null,
+      },
+    });
+    if (count === 0) return false;
+
+    await tx.assetHistory.create({
+      data: {
+        assetId,
+        action: HistoryAction.WAREHOUSE_TRANSFER,
+        fromWarehouseId: rejectedToWarehouseId,
+        toWarehouseId: asset.warehouseId,
+        note: `${REJECTED_TRANSFER_NOTE_PREFIX}, trả lại kho nguồn — Lý do: ${reason}`,
+        createdBy: currentUser.fullName,
+      },
+    });
+    return true;
   });
 
-  await prisma.assetHistory.create({
-    data: {
-      assetId,
-      action: HistoryAction.WAREHOUSE_TRANSFER,
-      fromWarehouseId: rejectedToWarehouseId,
-      toWarehouseId: asset.warehouseId,
-      note: `${REJECTED_TRANSFER_NOTE_PREFIX}, trả lại kho nguồn — Lý do: ${reason}`,
-      createdBy: currentUser.fullName,
-    },
-  });
+  if (!changed) {
+    return { error: "Trạng thái thiết bị vừa được người khác thay đổi. Vui lòng tải lại trang rồi thử lại." };
+  }
 
   // Trước đây redirect(detailUrl(...)) như các action khác — về lại đúng
   // trang chi tiết thiết bị. Nhưng SAU KHI TỪ CHỐI, thiết bị đã trả về kho
@@ -600,7 +642,17 @@ export async function returnAssetAction(
   // Các hành động KHÁC trên thiết bị (sửa, gán thêm, xoá, Chuyển kho...) vẫn
   // giữ nguyên assertWarehouseScope như cũ — nới lỏng này CHỈ áp dụng cho
   // đúng thao tác Thu hồi.
-  const destinationWarehouseId = currentUser.warehouse?.id ?? asset.warehouseId;
+  const destination = await resolveReturnWarehouse(
+    currentUser,
+    formData.get("returnWarehouseId"),
+    asset.warehouseId
+  );
+
+  if ("error" in destination) {
+    return { error: destination.error };
+  }
+
+  const destinationWarehouseId = destination.id;
 
   // Chỉ thiết bị ĐANG được cấp phát mới thu hồi được — trong kho thì không
   // có ai để thu hồi từ. Chặn ở server phòng submit form trực tiếp.
@@ -608,63 +660,73 @@ export async function returnAssetAction(
     return { error: "Chỉ có thể thu hồi thiết bị đang ở trạng thái Đã cấp phát." };
   }
 
-  await prisma.asset.update({
-    where: { id: assetId },
-    data: {
-      status: sendToRepair ? AssetStatus.REPAIR : AssetStatus.IN_STOCK,
-      currentEmployeeId: null,
-      warehouseId: destinationWarehouseId,
-      // Thiết bị không còn ai giữ nữa — xoá luôn loại cấp phát/hạn cảnh báo
-      // của lần bàn giao vừa kết thúc, tránh còn sót lại "Cấp mượn — quá hạn"
-      // trên 1 thiết bị đã về kho từ lâu (trang /assets/loans chỉ nên liệt kê
-      // thiết bị THỰC SỰ đang có người giữ quá hạn).
-      assignmentType: null,
-      assignmentDueAt: null,
-    },
-  });
-
-  // Bỏ tick "Có Adapter/Có dây sạc" nghĩa là phụ kiện đó KHÔNG có trong lần
-  // trả này — trước đây chỉ ghi chú "Thiếu: ..." vào lịch sử nhưng không xoá
-  // record AssetAccessory, nên panel "Phụ kiện đi kèm" vẫn báo còn đủ dù
-  // thực tế thiếu. Xoá luôn record tương ứng để phản ánh đúng tình trạng
-  // trong kho.
-  const accessoryKeywordsToRemove: string[] = [];
-  if (!hasAdapter) accessoryKeywordsToRemove.push("adapter");
-  if (!hasCable) accessoryKeywordsToRemove.push("cáp", "cap", "cable");
-
-  if (accessoryKeywordsToRemove.length > 0) {
-    await prisma.assetAccessory.deleteMany({
-      where: {
-        assetId,
-        OR: accessoryKeywordsToRemove.map((keyword) => ({
-          name: { contains: keyword, mode: "insensitive" as const },
-        })),
+  // Transaction + điều kiện trạng thái: 2 người thao tác cùng lúc / bấm
+  // đúp thì lần sau không ghi trùng lịch sử, báo lỗi rõ ràng.
+  const changed = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.asset.updateMany({
+      where: { id: assetId, status: AssetStatus.ASSIGNED },
+      data: {
+        status: sendToRepair ? AssetStatus.REPAIR : AssetStatus.IN_STOCK,
+        currentEmployeeId: null,
+        warehouseId: destinationWarehouseId,
+        // Thiết bị không còn ai giữ nữa — xoá luôn loại cấp phát/hạn cảnh báo
+        // của lần bàn giao vừa kết thúc, tránh còn sót lại "Cấp mượn — quá hạn"
+        // trên 1 thiết bị đã về kho từ lâu (trang /assets/loans chỉ nên liệt kê
+        // thiết bị THỰC SỰ đang có người giữ quá hạn).
+        assignmentType: null,
+        assignmentDueAt: null,
       },
     });
-  }
+    if (count === 0) return false;
 
-  // Ghi rõ trong lịch sử khi thiết bị "đổi kho" luôn trong lúc thu hồi (khác
-  // fromWarehouseId/toWarehouseId trước đây luôn bằng nhau) để Timeline vẫn
-  // đọc hiểu được vì sao thiết bị đang ở kho khác kho ban đầu.
-  const warehouseChangeNote =
-    destinationWarehouseId !== asset.warehouseId && currentUser.warehouse
-      ? `Nhập kho ${currentUser.warehouse.name}`
-      : null;
+    // Bỏ tick "Có Adapter/Có dây sạc" nghĩa là phụ kiện đó KHÔNG có trong lần
+    // trả này — trước đây chỉ ghi chú "Thiếu: ..." vào lịch sử nhưng không xoá
+    // record AssetAccessory, nên panel "Phụ kiện đi kèm" vẫn báo còn đủ dù
+    // thực tế thiếu. Xoá luôn record tương ứng để phản ánh đúng tình trạng
+    // trong kho.
+    const accessoryKeywordsToRemove: string[] = [];
+    if (!hasAdapter) accessoryKeywordsToRemove.push("adapter");
+    if (!hasCable) accessoryKeywordsToRemove.push("cáp", "cap", "cable");
 
-  await prisma.assetHistory.create({
-    data: {
-      assetId,
-      action: sendToRepair ? HistoryAction.REPAIR : HistoryAction.RETURN,
-      fromEmployeeId: asset.currentEmployeeId,
-      toEmployeeId: null,
-      fromWarehouseId: asset.warehouseId,
-      toWarehouseId: destinationWarehouseId,
-      note: [note, warehouseChangeNote].filter(Boolean).join(" | "),
-      createdBy: currentUser.fullName,
-    },
+    if (accessoryKeywordsToRemove.length > 0) {
+      await tx.assetAccessory.deleteMany({
+        where: {
+          assetId,
+          OR: accessoryKeywordsToRemove.map((keyword) => ({
+            name: { contains: keyword, mode: "insensitive" as const },
+          })),
+        },
+      });
+    }
+
+    // Ghi rõ trong lịch sử khi thiết bị "đổi kho" luôn trong lúc thu hồi (khác
+    // fromWarehouseId/toWarehouseId trước đây luôn bằng nhau) để Timeline vẫn
+    // đọc hiểu được vì sao thiết bị đang ở kho khác kho ban đầu.
+    const warehouseChangeNote =
+      destinationWarehouseId !== asset.warehouseId && destination.name
+        ? `Nhập kho ${destination.name}`
+        : null;
+
+    await tx.assetHistory.create({
+      data: {
+        assetId,
+        action: sendToRepair ? HistoryAction.REPAIR : HistoryAction.RETURN,
+        fromEmployeeId: asset.currentEmployeeId,
+        toEmployeeId: null,
+        fromWarehouseId: asset.warehouseId,
+        toWarehouseId: destinationWarehouseId,
+        note: [note, warehouseChangeNote].filter(Boolean).join(" | "),
+        createdBy: currentUser.fullName,
+      },
+    });
+    return true;
   });
 
-  redirect(detailUrl(assetId, returnTo));
+  if (!changed) {
+    return { error: "Trạng thái thiết bị vừa được người khác thay đổi. Vui lòng tải lại trang rồi thử lại." };
+  }
+
+  redirect(withFlash(detailUrl(assetId, returnTo), sendToRepair ? "asset_sent_repair" : "asset_returned"));
 }
 
 // Đánh dấu 1 thiết bị đang Bảo trì (REPAIR) đã xử lý xong — 2 hướng kết quả:
@@ -707,45 +769,65 @@ export async function completeRepairAction(
       return { error: "Vui lòng nhập lý do không sửa được." };
     }
 
-    await prisma.asset.update({
-      where: { id: assetId },
-      data: {
-        status: AssetStatus.RETIRED,
-        condition: `Chờ thanh lý: ${noteInput}`,
-      },
+    // Transaction + điều kiện trạng thái: 2 người thao tác cùng lúc / bấm
+    // đúp thì lần sau không ghi trùng lịch sử, báo lỗi rõ ràng.
+    const changed = await prisma.$transaction(async (tx) => {
+      const { count } = await tx.asset.updateMany({
+        where: { id: assetId, status: AssetStatus.REPAIR },
+        data: {
+          status: AssetStatus.RETIRED,
+          condition: `Chờ thanh lý: ${noteInput}`,
+        },
+      });
+      if (count === 0) return false;
+
+      await tx.assetHistory.create({
+        data: {
+          assetId,
+          action: HistoryAction.RETIRE,
+          fromWarehouseId: asset.warehouseId,
+          toWarehouseId: asset.warehouseId,
+          note: `Không sửa được, chuyển thẳng từ Bảo trì sang Chờ thanh lý — ${noteInput}`,
+          createdBy: currentUser.fullName,
+        },
+      });
+      return true;
     });
 
-    await prisma.assetHistory.create({
+    if (!changed) {
+      return { error: "Trạng thái thiết bị vừa được người khác thay đổi. Vui lòng tải lại trang rồi thử lại." };
+    }
+
+    redirect(withFlash(detailUrl(assetId, returnTo), "asset_retired"));
+  }
+
+  // Transaction + điều kiện trạng thái: 2 người thao tác cùng lúc / bấm
+  // đúp thì lần sau không ghi trùng lịch sử, báo lỗi rõ ràng.
+  const changed = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.asset.updateMany({
+      where: { id: assetId, status: AssetStatus.REPAIR },
+      data: { status: AssetStatus.IN_STOCK },
+    });
+    if (count === 0) return false;
+
+    await tx.assetHistory.create({
       data: {
         assetId,
-        action: HistoryAction.RETIRE,
-        fromWarehouseId: asset.warehouseId,
-        toWarehouseId: asset.warehouseId,
-        note: `Không sửa được, chuyển thẳng từ Bảo trì sang Chờ thanh lý — ${noteInput}`,
+        action: HistoryAction.UPDATE,
+        note: ["Hoàn tất sửa chữa/bảo hành — chuyển về Trong kho", noteInput || null]
+          .filter(Boolean)
+          .join(" | "),
         createdBy: currentUser.fullName,
       },
     });
+    return true;
+  });
 
-    redirect(detailUrl(assetId, returnTo));
+  if (!changed) {
+    return { error: "Trạng thái thiết bị vừa được người khác thay đổi. Vui lòng tải lại trang rồi thử lại." };
   }
 
-  await prisma.asset.update({
-    where: { id: assetId },
-    data: { status: AssetStatus.IN_STOCK },
-  });
-
-  await prisma.assetHistory.create({
-    data: {
-      assetId,
-      action: HistoryAction.UPDATE,
-      note: ["Hoàn tất sửa chữa/bảo hành — chuyển về Trong kho", noteInput || null]
-        .filter(Boolean)
-        .join(" | "),
-      createdBy: currentUser.fullName,
-    },
-  });
-
-  redirect(detailUrl(assetId, returnTo));
+  redirect(withFlash(detailUrl(assetId, returnTo), "asset_repair_completed"));
 }
 
 // "Hướng xử lý" IT điền cho 1 thiết bị đang sửa chữa/bảo hành ĐÃ QUÁ HẠN mà
@@ -793,7 +875,7 @@ export async function submitRepairFollowUpAction(
     },
   });
 
-  redirect(listUrl(returnTo, {}));
+  redirect(listUrl(returnTo, { flash: "asset_repair_followup" }));
 }
 
 // Xoá vĩnh viễn 1 thiết bị — dùng cho trường hợp nhập nhầm/nhập trùng lúc

@@ -17,7 +17,9 @@ import {
 export async function GET() {
   const user = await getCurrentUser();
 
-  if (!user) {
+  // Chưa qua 2FA / chưa đổi mật khẩu lần đầu thì coi như chưa đăng nhập —
+  // giống requireLogin(), tránh đọc thông báo chỉ với mật khẩu.
+  if (!user || !user.twoFactorVerified || user.mustChangePassword) {
     return NextResponse.json(
       { notifications: [], unreadCount: 0 },
       { status: 401 }

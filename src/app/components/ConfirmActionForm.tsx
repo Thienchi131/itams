@@ -3,9 +3,14 @@
 import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { TriangleAlert } from "lucide-react";
+import { showToast } from "@/lib/flash";
 
 type Color = "amber" | "rose" | "blue";
-type ActionState = { error: string } | null;
+type ActionState =
+  | { error: string }
+  | { success: string }
+  | { notice: string; secret?: string }
+  | null;
 
 export default function ConfirmActionForm({
   action,
@@ -50,6 +55,10 @@ export default function ConfirmActionForm({
   // isPending chuyển từ true -> false mà không có lỗi thì coi là vừa xử lý
   // xong thành công, tự tắt modal.
   const wasPendingRef = useRef(false);
+  // Notice đã được Admin bấm "đã lưu, đóng" — mở lại modal thì không hiện lại
+  // notice cũ (useActionState giữ state của lần chạy trước).
+  const [dismissed, setDismissed] = useState<ActionState>(null);
+  const showNotice = state !== null && "notice" in state && state !== dismissed;
 
   useEffect(() => {
     if (isPending) {
@@ -57,7 +66,12 @@ export default function ConfirmActionForm({
       return;
     }
 
-    if (wasPendingRef.current && !state?.error) {
+    // Xong không lỗi: báo thành công bằng toast rồi đóng modal. Có "notice"
+    // (VD mật khẩu tạm vì gửi mail thất bại) thì GIỮ modal để Admin đọc.
+    if (wasPendingRef.current && state && "success" in state) {
+      showToast(state.success);
+      setOpen(false);
+    } else if (wasPendingRef.current && !state) {
       setOpen(false);
     }
 
@@ -114,13 +128,36 @@ export default function ConfirmActionForm({
                 {message}
               </p>
 
-              {state?.error && (
+              {state && "error" in state && (
                 <div className="mt-5 flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-left text-sm font-medium text-rose-700">
                   <TriangleAlert size={18} className="mt-0.5 shrink-0" />
                   <span>{state.error}</span>
                 </div>
               )}
 
+              {showNotice && state && "notice" in state ? (
+                <div className="mt-5 space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left text-sm font-medium text-amber-900">
+                  <div className="flex items-start gap-2.5">
+                    <TriangleAlert size={18} className="mt-0.5 shrink-0" />
+                    <span>{state.notice}</span>
+                  </div>
+                  {state.secret && (
+                    <p className="select-all rounded-xl border border-amber-300 bg-white px-4 py-3 text-center font-mono text-lg tracking-wider text-slate-900">
+                      {state.secret}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDismissed(state);
+                      setOpen(false);
+                    }}
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-3 text-base font-bold text-slate-900 hover:bg-slate-100"
+                  >
+                    Đã lưu lại, đóng
+                  </button>
+                </div>
+              ) : (
               <div className="mt-8 grid grid-cols-2 gap-4">
                 <button
                   type="button"
@@ -140,6 +177,7 @@ export default function ConfirmActionForm({
                   {isPending ? "Đang xử lý..." : confirmLabel}
                 </button>
               </div>
+              )}
             </div>
           </div>,
           document.body

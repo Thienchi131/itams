@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/modules/auth/auth.service";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { withFlash } from "@/lib/flash";
 
 // Dùng khi IT tạo hồ sơ nhân viên trước, chưa có mã nhân viên chính thức
 // (thường do HR chưa cấp kịp) — để trống ô "Mã nhân viên" sẽ tự sinh mã
@@ -173,7 +174,7 @@ export async function createEmployeeAction(formData: FormData) {
     redirect(`/employees/new?error=${encodeURIComponent(result.error)}`);
   }
 
-  redirect(`/employees/${result.employee.id}`);
+  redirect(withFlash(`/employees/${result.employee.id}`, "employee_created"));
 }
 
 export type QuickCreateEmployeeState = CreateEmployeeResult;

@@ -1,21 +1,13 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { generateUniqueAssetTag } from "@/modules/asset/asset-tag";
 import { AssetStatus, HistoryAction, StockInType } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { requireRole, assertWarehouseScope } from "@/modules/auth/auth.service";
 import { ROLE_ADMIN, ROLE_IT } from "@/modules/auth/permissions";
 import { STOCK_IN_TYPE_LABEL } from "@/modules/asset/asset.helpers";
-
-function generateAssetTag(index: number) {
-  const now = new Date();
-  const dd = String(now.getDate()).padStart(2, "0");
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const yy = String(now.getFullYear()).slice(-2);
-  const seq = String((Date.now() + index) % 10000000).padStart(7, "0");
-
-  return `IT-${dd}${mm}${yy}-${seq}`;
-}
+import { withFlash } from "@/lib/flash";
 
 function addMonths(date: Date, months: number) {
   const result = new Date(date);
@@ -38,7 +30,7 @@ const RETURN_REASON_LABELS: Record<string, string> = {
  * Trả về 2 danh sách riêng: serial bị lặp NGAY TRONG những dòng vừa nhập,
  * và serial đã tồn tại sẵn trong hệ thống (thiết bị khác đã dùng rồi).
  */
-export async function findDuplicateSerials(serialNumbers: string[]) {
+async function findDuplicateSerials(serialNumbers: string[]) {
   const seen = new Set<string>();
   const duplicatedInInput = new Set<string>();
 
@@ -277,7 +269,7 @@ export async function createStockInAction(
       },
     });
 
-    let assetIndex = 0;
+    const usedTags = new Set<string>();
 
     for (const line of lines) {
       const model = modelsById.get(line.modelId)!;
@@ -294,7 +286,7 @@ export async function createStockInAction(
       for (const serialNumber of line.serialNumbers) {
         const asset = await tx.asset.create({
           data: {
-            assetTag: generateAssetTag(assetIndex++),
+            assetTag: await generateUniqueAssetTag(tx, usedTags),
             serialNumber,
             modelId: model.id,
             actualCpu: model.defaultCpu,
@@ -418,5 +410,5 @@ export async function createStockInAction(
     }
   });
 
-  redirect("/assets");
+  redirect(withFlash("/assets", "stock_in_created"));
 }

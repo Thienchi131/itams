@@ -5,6 +5,7 @@ import { requireRole, assertWarehouseScope } from "@/modules/auth/auth.service";
 import { ROLE_ADMIN, ROLE_IT } from "@/modules/auth/permissions";
 import { SupplyTransactionType } from "@prisma/client";
 import { redirect } from "next/navigation";
+import { withFlash } from "@/lib/flash";
 import { createAuditLog } from "@/modules/audit/audit-log.service";
 
 export type SupplyTxState = { error: string } | null;
@@ -19,8 +20,8 @@ export async function stockInSupplyAction(
   const quantity = Number(formData.get("quantity"));
   const note = String(formData.get("note") || "").trim();
 
-  if (!supplyId || !quantity || quantity <= 0) {
-    return { error: "Số lượng nhập không hợp lệ" };
+  if (!supplyId || !Number.isInteger(quantity) || quantity <= 0) {
+    return { error: "Số lượng nhập phải là số nguyên lớn hơn 0" };
   }
 
   const target = await prisma.supply.findUnique({ where: { id: supplyId } });
@@ -48,7 +49,7 @@ export async function stockInSupplyAction(
     });
   });
 
-  redirect(`/supplies/${supplyId}`);
+  redirect(withFlash(`/supplies/${supplyId}`, "supply_stocked_in"));
 }
 
 // Xoá vĩnh viễn 1 vật tư — dùng cho trường hợp tạo nhầm/tạo trùng mã lúc
@@ -117,8 +118,8 @@ export async function stockOutSupplyAction(
   const quantity = Number(formData.get("quantity"));
   const note = String(formData.get("note") || "").trim();
 
-  if (!supplyId || !quantity || quantity <= 0) {
-    return { error: "Số lượng xuất không hợp lệ" };
+  if (!supplyId || !Number.isInteger(quantity) || quantity <= 0) {
+    return { error: "Số lượng xuất phải là số nguyên lớn hơn 0" };
   }
 
   if (!note) {
@@ -139,11 +140,14 @@ export async function stockOutSupplyAction(
     };
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.supply.update({
-      where: { id: supplyId },
+  // Trừ kho CÓ điều kiện còn đủ hàng ngay trong câu UPDATE — trước đây kiểm
+  // tra tồn ở trên rồi mới trừ, 2 người xuất cùng lúc có thể làm âm kho.
+  const ok = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.supply.updateMany({
+      where: { id: supplyId, quantity: { gte: quantity } },
       data: { quantity: { decrement: quantity } },
     });
+    if (count === 0) return false;
 
     await tx.supplyTransaction.create({
       data: {
@@ -154,7 +158,12 @@ export async function stockOutSupplyAction(
         createdBy: currentUser.fullName,
       },
     });
+    return true;
   });
 
-  redirect(`/supplies/${supplyId}`);
+  if (!ok) {
+    return { error: "Tồn kho vừa thay đổi, không còn đủ số lượng để xuất. Vui lòng tải lại trang." };
+  }
+
+  redirect(withFlash(`/supplies/${supplyId}`, "supply_stocked_out"));
 }

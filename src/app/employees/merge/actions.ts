@@ -15,7 +15,7 @@ import { revalidatePath } from "next/cache";
  *   trước khi xoá, tránh mất dữ liệu.
  * - Các bản trùng bị xoá sau khi đã dồn hết dữ liệu.
  */
-export type MergeEmployeesState = { error: string } | null;
+export type MergeEmployeesState = { error?: string; success?: string } | null;
 
 export async function mergeEmployeesAction(
   _prevState: MergeEmployeesState,
@@ -85,5 +85,5 @@ export async function mergeEmployeesAction(
   });
 
   revalidatePath("/employees");
-  return null;
+  return { success: "Đã gộp nhân viên." };
 }

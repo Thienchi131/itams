@@ -14,6 +14,7 @@ import {
   FileBarChart,
   TriangleAlert,
   Truck,
+  Menu,
 } from "lucide-react";
 
 import { requireLogin } from "@/modules/auth/auth.service";
@@ -91,8 +92,18 @@ export default async function AppLayout({
 
   return (
     <main className="min-h-screen bg-[#f4f8fc] text-slate-900">
+      {/* Màn hình hẹp (< lg): sidebar ẩn, mở bằng nút menu. Dùng checkbox +
+          peer-checked thuần CSS (không cần JS) — AppMenuLink tự bỏ tick khi
+          bấm 1 mục để menu đóng sau khi chuyển trang. */}
+      <input id="nav-toggle" type="checkbox" className="peer sr-only" aria-label="Mở menu" />
+      <label
+        htmlFor="nav-toggle"
+        aria-hidden="true"
+        className="fixed inset-0 z-30 hidden bg-black/40 peer-checked:block lg:!hidden"
+      />
+
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-screen w-64 overflow-hidden bg-gradient-to-b from-[#5B93F5] via-[#3E74E8] to-[#2C58C9] text-white">
+      <aside className="fixed left-0 top-0 z-40 h-screen w-64 -translate-x-full overflow-hidden bg-gradient-to-b from-[#5B93F5] via-[#3E74E8] to-[#2C58C9] text-white transition-transform duration-200 peer-checked:translate-x-0 lg:translate-x-0">
         {/* Logo */}
         <div className="p-4">
           <div className="flex items-center gap-2.5">
@@ -225,7 +236,19 @@ export default async function AppLayout({
       </aside>
 
       {/* Content */}
-      <section className="ml-64 min-h-screen">
+      <section className="min-h-screen lg:ml-64">
+        {/* Thanh trên cùng chỉ hiện ở màn hình hẹp — nút mở menu */}
+        <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
+          <label
+            htmlFor="nav-toggle"
+            className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-slate-200 text-slate-700"
+          >
+            <Menu size={20} />
+            <span className="sr-only">Mở menu</span>
+          </label>
+          <span className="text-base font-bold text-slate-900">ITAMS</span>
+        </div>
+
         {/* Banner cố định, không tự đóng được — cố tình KHÔNG có nút "x" để
             không thể lỡ bấm ẩn đi rồi quên mất, vẫn thấy ở mọi trang cho tới
             khi thực sự bấm vào xử lý (Gia hạn sửa chữa/Sửa xong/Không sửa
@@ -284,7 +307,7 @@ export default async function AppLayout({
 
         {!hideTopbar && <AppTopbar bell={<NotificationBell />} />}
 
-        <div className="p-6">{children}</div>
+        <div className="p-4 sm:p-6">{children}</div>
       </section>
     </main>
   );

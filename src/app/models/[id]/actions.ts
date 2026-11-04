@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/modules/auth/auth.service";
 import { redirect } from "next/navigation";
+import { withFlash } from "@/lib/flash";
 
 function getSmartValue(formData: FormData, name: string) {
   const selected = String(formData.get(`${name}Select`) || "").trim();
@@ -135,5 +136,5 @@ export async function updateModelAction(formData: FormData) {
     },
   });
 
-  redirect(`/models${qSuffix}`);
+  redirect(withFlash(`/models${qSuffix}`, "model_updated"));
 }

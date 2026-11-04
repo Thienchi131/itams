@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { showToast } from "@/lib/flash";
 import { TriangleAlert, Trash2 } from "lucide-react";
 import { confirmLiquidationAction, type LiquidationActionState } from "./actions";
 import ConfirmActionButton from "../../components/ConfirmActionButton";
@@ -10,6 +11,11 @@ export default function ConfirmLiquidationForm({ assetId }: { assetId: number })
     confirmLiquidationAction,
     null
   );
+
+  // Action không redirect -> tự hiện toast khi trả về success.
+  useEffect(() => {
+    if (state?.success) showToast(state.success);
+  }, [state]);
 
   return (
     <form action={formAction} className="inline-flex flex-col items-end gap-1">

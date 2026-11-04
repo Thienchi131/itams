@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole, assertWarehouseScope } from "@/modules/auth/auth.service";
 import { ROLE_ADMIN, ROLE_IT } from "@/modules/auth/permissions";
 import { redirect } from "next/navigation";
+import { withFlash } from "@/lib/flash";
 
 export type UpdateSupplyState = { error: string } | null;
 
@@ -62,5 +63,5 @@ export async function updateSupplyAction(
     data: { code, name, unit, minQuantity, note: note || null, warehouseId },
   });
 
-  redirect(`/supplies/${id}`);
+  redirect(withFlash(`/supplies/${id}`, "supply_updated"));
 }

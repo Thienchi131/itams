@@ -20,6 +20,11 @@ export default function AppMenuLink({
   return (
     <Link
       href={href}
+      onClick={() => {
+        // Đóng menu trượt trên màn hình hẹp sau khi chọn (xem AppLayout).
+        const toggle = document.getElementById("nav-toggle") as HTMLInputElement | null;
+        if (toggle) toggle.checked = false;
+      }}
       className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
         active
           ? "bg-white text-blue-700 shadow-sm"

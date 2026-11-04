@@ -5,6 +5,7 @@ import { requireRole } from "@/modules/auth/auth.service";
 import { ROLE_ADMIN, ROLE_IT } from "@/modules/auth/permissions";
 import { SupplyTransactionType } from "@prisma/client";
 import { redirect } from "next/navigation";
+import { withFlash } from "@/lib/flash";
 
 export type CreateSupplyState = { error: string } | null;
 
@@ -77,5 +78,5 @@ export async function createSupplyAction(
     return created;
   });
 
-  redirect(`/supplies/${supply.id}`);
+  redirect(withFlash(`/supplies/${supply.id}`, "supply_created"));
 }

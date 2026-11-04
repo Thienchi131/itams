@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/modules/auth/auth.service";
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
+import { withFlash } from "@/lib/flash";
 
 export type ChangePasswordState = { error: string } | null;
 
@@ -37,5 +38,5 @@ export async function changePasswordAction(
     },
   });
 
-  redirect(`/users/${id}`);
+  redirect(withFlash(`/users/${id}`, "user_password_changed"));
 }

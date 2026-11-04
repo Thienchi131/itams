@@ -19,10 +19,10 @@ test("Admin thấy tất cả menu", () => {
   assert.equal(canAccessMenu(ROLE_ADMIN, "settings"), true);
 });
 
-test("IT không thấy Quản lý tài khoản, Cài đặt và Model Library", () => {
+test("IT không thấy Quản lý tài khoản và Cài đặt, nhưng xem được Model Library", () => {
   assert.equal(canAccessMenu(ROLE_IT, "users"), false);
   assert.equal(canAccessMenu(ROLE_IT, "settings"), false);
-  assert.equal(canAccessMenu(ROLE_IT, "models"), false);
+  assert.equal(canAccessMenu(ROLE_IT, "models"), true);
 });
 
 test("IT vẫn thấy dashboard, assets, supplies, employees", () => {
@@ -32,13 +32,14 @@ test("IT vẫn thấy dashboard, assets, supplies, employees", () => {
   assert.equal(canAccessMenu(ROLE_IT, "employees"), true);
 });
 
-test("User (viewer) chỉ thấy assets, supplies, employees", () => {
+test("User (viewer) xem được mọi menu trừ Quản lý tài khoản và Cài đặt", () => {
   assert.equal(canAccessMenu(ROLE_USER, "assets"), true);
   assert.equal(canAccessMenu(ROLE_USER, "supplies"), true);
   assert.equal(canAccessMenu(ROLE_USER, "employees"), true);
+  assert.equal(canAccessMenu(ROLE_USER, "dashboard"), true);
+  assert.equal(canAccessMenu(ROLE_USER, "models"), true);
+  assert.equal(canAccessMenu(ROLE_USER, "reports"), true);
 
-  assert.equal(canAccessMenu(ROLE_USER, "dashboard"), false);
-  assert.equal(canAccessMenu(ROLE_USER, "models"), false);
   assert.equal(canAccessMenu(ROLE_USER, "users"), false);
   assert.equal(canAccessMenu(ROLE_USER, "settings"), false);
 });
@@ -57,7 +58,8 @@ test("canEditData chỉ đúng cho Admin và IT", () => {
 test("getDefaultRouteForRole đá về '/' nếu vào được dashboard, ngược lại '/assets'", () => {
   assert.equal(getDefaultRouteForRole(ROLE_ADMIN), "/");
   assert.equal(getDefaultRouteForRole(ROLE_IT), "/");
-  // User không vào được dashboard (canAccessMenu false) -> rơi về /assets
-  // để tránh vòng lặp redirect.
-  assert.equal(getDefaultRouteForRole(ROLE_USER), "/assets");
+  // Mọi role hiện đều vào được dashboard nên đều về "/"; role không tồn
+  // tại (không vào được dashboard) rơi về /assets để tránh lặp redirect.
+  assert.equal(getDefaultRouteForRole(ROLE_USER), "/");
+  assert.equal(getDefaultRouteForRole("KhongTonTai"), "/assets");
 });

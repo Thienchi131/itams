@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { AssetModelTag } from "@prisma/client";
 import { updateModelTagAction } from "./actions";
+import { showToast } from "@/lib/flash";
 
 type Model = {
   id: number;
@@ -43,7 +44,12 @@ export default function ModelTagRow({ model }: { model: Model }) {
       <td className="p-4 text-slate-500">{model.modelCode || "—"}</td>
 
       <td className="p-4">
-        <form action={updateModelTagAction}>
+        <form
+          action={async (formData) => {
+            await updateModelTagAction(formData);
+            showToast(`Đã cập nhật tag cho ${model.modelCode || model.modelName}.`);
+          }}
+        >
           <input type="hidden" name="id" value={model.id} />
           <select
             name="tag"

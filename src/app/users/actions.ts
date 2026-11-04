@@ -8,7 +8,14 @@ import { sendUserPasswordEmail } from "@/lib/mail";
 import { requireRole } from "@/modules/auth/auth.service";
 import { createAuditLog } from "@/modules/audit/audit-log.service";
 
-export type UserActionState = { error: string } | null;
+// error: lỗi, hiện trong modal. success: xong, modal tự đóng + hiện toast.
+// notice: xong nhưng có điều Admin PHẢI đọc (VD mật khẩu tạm khi gửi mail
+// thất bại) — modal giữ nguyên để hiện nội dung.
+export type UserActionState =
+  | { error: string }
+  | { success: string }
+  | { notice: string; secret?: string }
+  | null;
 
 export async function resetUserPasswordAction(
   _prevState: UserActionState,
@@ -41,16 +48,6 @@ export async function resetUserPasswordAction(
     },
   });
 
-  // Không await — cùng lý do như bên users/new/actions.ts: SMTP chậm/bị
-  // chặn không được phép treo cả trang Reset password.
-  sendUserPasswordEmail({
-    to: user.username,
-    fullName: user.fullName,
-    password: newPassword,
-  }).catch((error) => {
-    console.error("SEND_EMAIL_ERROR:", error);
-  });
-
   await createAuditLog({
     actorName: currentUser.fullName,
     action: "Reset mật khẩu",
@@ -60,7 +57,25 @@ export async function resetUserPasswordAction(
   });
 
   revalidatePath("/users");
-  return null;
+
+  // Await để biết email có tới không (transporter có timeout 10s). Trước đây
+  // gửi kiểu "bắn rồi quên": SMTP lỗi thì modal vẫn đóng như thành công,
+  // user bị đổi mật khẩu mà không ai biết mật khẩu mới.
+  try {
+    await sendUserPasswordEmail({
+      to: user.username,
+      fullName: user.fullName,
+      password: newPassword,
+    });
+  } catch (error) {
+    console.error("SEND_EMAIL_ERROR:", error);
+    return {
+      notice: `Đã đặt lại mật khẩu cho ${user.fullName} nhưng gửi email thất bại. Hãy chuyển mật khẩu tạm dưới đây cho người dùng qua kênh an toàn (chỉ hiện 1 lần):`,
+      secret: newPassword,
+    };
+  }
+
+  return { success: `Đã đặt lại mật khẩu và gửi email cho ${user.fullName}.` };
 }
 
 // Escape hatch cho Admin khi user mất điện thoại/đổi máy nên không còn truy
@@ -95,7 +110,7 @@ export async function resetUserTwoFactorAction(
   });
 
   revalidatePath("/users");
-  return null;
+  return { success: `Đã reset 2FA cho ${user.fullName}. Người dùng sẽ thiết lập lại ở lần đăng nhập tới.` };
 }
 
 export async function deleteUserAction(
@@ -145,5 +160,5 @@ export async function deleteUserAction(
   });
 
   revalidatePath("/users");
-  return null;
+  return { success: `Đã xoá tài khoản ${user.fullName}.` };
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { generateUniqueAssetTag } from "@/modules/asset/asset-tag";
 import { requireRole } from "@/modules/auth/auth.service";
 import { createAuditLog } from "@/modules/audit/audit-log.service";
 import { AssetStatus, HistoryAction, StockInType } from "@prisma/client";
@@ -131,16 +132,6 @@ function excelDate(value: unknown) {
   }
 
   return parsed;
-}
-
-function generateAssetTag(index: number) {
-  const now = new Date();
-  const dd = String(now.getDate()).padStart(2, "0");
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const yy = String(now.getFullYear()).slice(-2);
-  const seq = String((Date.now() + index) % 10000000).padStart(7, "0");
-
-  return `IT-${dd}${mm}${yy}-${seq}`;
 }
 
 function inferBrand(category: string, modelName: string) {
@@ -422,6 +413,12 @@ export async function importAssetsAction(formData: FormData) {
     const { skipped, createdCount, updatedCount } = await runImport(
       worksheet,
       currentUser.fullName,
+      {
+        // IT chỉ được import vào kho thuộc phạm vi của mình, và không được tự
+        // tạo kho mới (tạo kho là quyền Admin ở Cài đặt > Kho).
+        regionWarehouseIds: currentUser.regionWarehouseIds,
+        canCreateWarehouse: currentUser.role.name === "Admin",
+      },
       (step, rowNum) => {
         currentStep = step;
         currentRowNum = rowNum;
@@ -495,6 +492,7 @@ export async function importAssetsAction(formData: FormData) {
 async function runImport(
   worksheet: ExcelJS.Worksheet,
   importedByName: string,
+  scope: { regionWarehouseIds: number[] | null; canCreateWarehouse: boolean },
   onProgress: (step: string, rowNum: number | null) => void
 ) {
   // Trước đây các dòng thiếu cột bắt buộc bị "continue" (bỏ qua) hoàn toàn
@@ -502,6 +500,8 @@ async function runImport(
   // để sửa lại file. Giờ ghi lại từng dòng bị bỏ qua kèm lý do, trả về cho
   // importAssetsAction() hiển thị thành cảnh báo rõ ràng sau khi import xong.
   const skipped: { rowNum: number; reason: string }[] = [];
+  // Asset Tag đã cấp trong lần import này (tránh trùng trong cùng lô).
+  const usedTags = new Set<string>();
 
   // Đếm để tóm tắt kết quả cho người import xem ngay (và ghi vào AuditLog) —
   // "updatedAssetIds" dùng Set vì 1 asset có thể bị chạm tới ở CẢ 2 khối
@@ -693,6 +693,10 @@ async function runImport(
     const cached = warehouseByKey.get(key);
     if (cached) return cached;
 
+    // Không phải Admin thì KHÔNG tự tạo kho mới từ file Excel (gõ sai tên kho
+    // trước đây âm thầm sinh ra kho rác) — dòng đó bị bỏ qua kèm lý do.
+    if (!scope.canCreateWarehouse) return null;
+
     const created = await prisma.warehouse.upsert({
       where: { code: key },
       update: {},
@@ -781,6 +785,22 @@ async function runImport(
 
     const rowWarehouse = await resolveWarehouse(warehouseText);
 
+    if (!rowWarehouse) {
+      skipped.push({
+        rowNum,
+        reason: `Nhập kho — kho "${warehouseText}" chưa có trong hệ thống. Kiểm tra lại tên kho hoặc nhờ Admin tạo ở Cài đặt > Kho.`,
+      });
+      continue;
+    }
+
+    if (scope.regionWarehouseIds && !scope.regionWarehouseIds.includes(rowWarehouse.id)) {
+      skipped.push({
+        rowNum,
+        reason: `Nhập kho — kho "${rowWarehouse.name}" nằm ngoài khu vực bạn được phân quyền.`,
+      });
+      continue;
+    }
+
     let model = await prisma.assetModel.findUnique({
       where: { modelCode },
     });
@@ -829,6 +849,22 @@ async function runImport(
     // bàn giao lại lần 2 mới thấy đúng). Bỏ qua an toàn — nếu Admin thực sự
     // muốn thu hồi thiết bị này về kho, dùng nút Thu hồi ở trang chi tiết
     // thay vì import lại.
+    // Máy đang luân chuyển chờ xác nhận / đã thanh lý xong: ghi đè sẽ làm treo
+    // lượt luân chuyển (pendingTransfer*) hoặc "hồi sinh" máy đã thanh lý.
+    if (
+      existed &&
+      (existed.status === AssetStatus.IN_TRANSIT ||
+        (existed.status === AssetStatus.RETIRED && existed.liquidatedAt))
+    ) {
+      skipped.push({
+        rowNum,
+        reason: `Nhập kho — Serial "${serialNumber}" đang ${
+          existed.status === AssetStatus.IN_TRANSIT ? "luân chuyển kho chờ xác nhận" : "ở trạng thái Đã thanh lý"
+        }, bỏ qua để tránh ghi đè.`,
+      });
+      continue;
+    }
+
     if (existed && existed.status === AssetStatus.ASSIGNED) {
       skipped.push({
         rowNum,
@@ -893,7 +929,7 @@ async function runImport(
         })
       : await prisma.asset.create({
           data: {
-            assetTag: generateAssetTag(i),
+            assetTag: await generateUniqueAssetTag(prisma, usedTags),
             serialNumber,
             modelId: model.id,
             actualCpu: model.defaultCpu,

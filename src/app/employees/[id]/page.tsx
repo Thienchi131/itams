@@ -22,6 +22,10 @@ import {
   BadgeCheck,
   Pencil,
 } from "lucide-react";
+import {
+  getReturnWarehouseOptions,
+  defaultReturnWarehouseId,
+} from "@/modules/warehouse/return-destination";
 
 export default async function EmployeeDetailPage({
   params,
@@ -46,6 +50,12 @@ export default async function EmployeeDetailPage({
         getEmployees(),
       ])
     : [[], []];
+
+  // Kho được phép chọn khi thu hồi hàng loạt (ô "Nhập về kho" chỉ hiện nếu
+  // tài khoản phụ trách >= 2 kho).
+  const returnWarehouseOptions = canEdit
+    ? await getReturnWarehouseOptions(currentUser)
+    : [];
 
   return (
     <AppLayout>
@@ -146,6 +156,12 @@ export default async function EmployeeDetailPage({
               assets={employee.assets}
               availableAssets={availableAssets}
               employees={allEmployees}
+              returnWarehouseOptions={returnWarehouseOptions}
+              defaultReturnWarehouseId={defaultReturnWarehouseId(
+                returnWarehouseOptions,
+                currentUser.warehouseId,
+                null
+              )}
             />
           ) : (
             <section className="col-span-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

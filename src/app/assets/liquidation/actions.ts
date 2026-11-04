@@ -5,7 +5,7 @@ import { requireRole, assertWarehouseScope } from "@/modules/auth/auth.service";
 import { AssetStatus, HistoryAction } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
-export type LiquidationActionState = { error: string } | null;
+export type LiquidationActionState = { error?: string; success?: string } | null;
 
 // Xác nhận 1 thiết bị đang "Chờ thanh lý" (status=RETIRED, liquidatedAt còn
 // null) đã thực sự được xử lý xong (bán/huỷ) — chuyển sang "Đã thanh lý"
@@ -69,7 +69,7 @@ export async function confirmLiquidationAction(
   // Ở lại trang Kho thanh lý (không redirect) — chỉ cần làm mới data để máy
   // vừa xác nhận chuyển từ tab Chờ sang tab Đã thanh lý ngay lập tức.
   revalidatePath("/assets/liquidation");
-  return null;
+  return { success: "Đã xác nhận thanh lý." };
 }
 
 // ---------------------------------------------------------------------------

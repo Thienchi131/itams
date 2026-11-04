@@ -4,13 +4,16 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/modules/auth/auth.service";
 import { redirect } from "next/navigation";
 import { createAuditLog } from "@/modules/audit/audit-log.service";
+import { withFlash } from "@/lib/flash";
 
 export async function updateUserAction(formData: FormData) {
   const currentUser = await requireRole(["Admin"]);
 
   const id = Number(formData.get("id"));
   const fullName = String(formData.get("fullName") || "").trim();
-  const username = String(formData.get("username") || "").trim();
+  // Chuẩn hoá giống lúc tạo tài khoản + lúc đăng nhập (đều lowercase) —
+  // trước đây lưu nguyên chữ hoa khiến user không đăng nhập được nữa.
+  const username = String(formData.get("username") || "").trim().toLowerCase();
   const roleId = Number(formData.get("roleId"));
   const regionIdRaw = String(formData.get("regionId") || "").trim();
   const warehouseIdRaw = String(formData.get("warehouseId") || "").trim();
@@ -25,6 +28,39 @@ export async function updateUserAction(formData: FormData) {
     .getAll("extraWarehouseIds")
     .map((value) => Number(value))
     .filter((value) => Number.isInteger(value) && value > 0);
+
+  const editUrl = `/users/${id}/edit`;
+
+  if (!fullName || !username || !roleId) {
+    redirect(withFlash(editUrl, "err_user_missing_fields"));
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(username)) {
+    redirect(withFlash(editUrl, "err_user_invalid_email"));
+  }
+
+  const [target, duplicate, newRole] = await Promise.all([
+    prisma.user.findUnique({ where: { id }, include: { role: true } }),
+    prisma.user.findFirst({ where: { username, NOT: { id } } }),
+    prisma.role.findUnique({ where: { id: roleId } }),
+  ]);
+
+  if (!target || !newRole) {
+    redirect("/users");
+  }
+
+  if (duplicate) {
+    redirect(withFlash(editUrl, "err_user_duplicate_email"));
+  }
+
+  // Giống chặn ở deleteUserAction: không để hệ thống mất Admin cuối cùng
+  // (kể cả Admin tự hạ quyền chính mình).
+  if (target.role.name === "Admin" && newRole.name !== "Admin") {
+    const adminCount = await prisma.user.count({ where: { role: { name: "Admin" } } });
+    if (adminCount <= 1) {
+      redirect(withFlash(editUrl, "err_user_last_admin"));
+    }
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
@@ -58,5 +94,5 @@ export async function updateUserAction(formData: FormData) {
     detail: `${fullName} (${username})`,
   });
 
-  redirect(`/users/${id}`);
+  redirect(withFlash(`/users/${id}`, "user_updated"));
 }

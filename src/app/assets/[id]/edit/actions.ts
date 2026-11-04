@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireLogin, assertWarehouseScope } from "@/modules/auth/auth.service";
 import { ROLE_ADMIN } from "@/modules/auth/permissions";
 import { redirect } from "next/navigation";
+import { withFlash } from "@/lib/flash";
 
 function textOrNull(value: FormDataEntryValue | null) {
   const text = String(value || "").trim();
@@ -83,5 +84,5 @@ export async function updateAssetAction(
     },
   });
 
-  redirect(`/assets/${id}`);
+  redirect(withFlash(`/assets/${id}`, "asset_updated"));
 }

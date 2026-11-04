@@ -13,6 +13,7 @@ import { requireLogin } from "@/modules/auth/auth.service";
 import { canEditData, ROLE_ADMIN } from "@/modules/auth/permissions";
 import { notFound } from "next/navigation";
 import ReturnAssetModal from "./ReturnAssetModal";
+import { defaultReturnWarehouseId } from "@/modules/warehouse/return-destination";
 import CompleteRepairForm from "./CompleteRepairForm";
 import DeleteAssetModal from "./DeleteAssetModal";
 import AssetQrCard from "./AssetQrCard";
@@ -90,6 +91,13 @@ export default async function AssetDetailPage({
   // hiển thị tên kho trong Timeline (fromWarehouseId/toWarehouseId chỉ lưu
   // ID, không có relation object sẵn).
   const warehouses = await prisma.warehouse.findMany({ orderBy: { code: "asc" } });
+
+  // Kho được phép chọn khi THU HỒI (ô "Nhập về kho" chỉ hiện nếu >= 2 kho).
+  const returnWarehouseOptions = warehouses
+    .filter(
+      (w) => !currentUser.regionWarehouseIds || currentUser.regionWarehouseIds.includes(w.id)
+    )
+    .map((w) => ({ id: w.id, code: w.code, name: w.name }));
 
   if (!asset) notFound();
 
@@ -543,7 +551,16 @@ Thiết bị đã được tiếp nhận về kho.`;
                     color="orange"
                   >
                     <div className="mt-4">
-                      <ReturnAssetModal assetId={asset.id} returnTo={backHref} />
+                      <ReturnAssetModal
+                        assetId={asset.id}
+                        returnTo={backHref}
+                        warehouseOptions={returnWarehouseOptions}
+                        defaultWarehouseId={defaultReturnWarehouseId(
+                          returnWarehouseOptions,
+                          currentUser.warehouseId,
+                          asset.warehouseId
+                        )}
+                      />
                     </div>
                   </ActionCard>
                 )}
