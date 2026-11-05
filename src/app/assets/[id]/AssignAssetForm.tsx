@@ -4,6 +4,13 @@ import { useActionState, useRef, useState } from "react";
 import { TriangleAlert } from "lucide-react";
 import EmployeeSelect from "@/app/components/EmployeeSelect";
 import { assignAssetAction, type AssetActionState } from "./actions";
+import HandoverPhotoPicker, {
+  useHandoverPhotoPicker,
+} from "@/app/components/HandoverPhotoPicker";
+import {
+  HANDOVER_PHOTO_DUE_DAYS,
+  HANDOVER_PHOTO_MAX_COUNT,
+} from "@/modules/asset/handover-photo.helpers";
 
 type HeldAsset = {
   id: number;
@@ -92,6 +99,11 @@ export default function AssignAssetForm({
     null
   );
 
+  // Ảnh xác nhận bàn giao (không bắt buộc) — state đặt ở đây (không phải
+  // trong modal) để ảnh đã chọn không bị mất khi modal đóng lúc submit, nếu
+  // server trả lỗi thì IT không phải chọn/chụp lại.
+  const photoPicker = useHandoverPhotoPicker(HANDOVER_PHOTO_MAX_COUNT);
+
   // Tình trạng phụ kiện hiện đang ghi nhận trên thiết bị (trong kho) — nếu
   // thiếu, cho phép IT tick "bổ sung" ngay lúc bàn giao thay vì phải vào
   // sửa thiết bị riêng sau đó.
@@ -117,6 +129,9 @@ export default function AssignAssetForm({
   }
 
   function handleConfirm() {
+    // Đang nén ảnh dở — chờ xong mới gửi, tránh mất ảnh vừa chọn.
+    if (photoPicker.busy) return;
+
     if (!assignmentType) {
       setAssignmentTypeError(true);
       return;
@@ -134,7 +149,13 @@ export default function AssignAssetForm({
   }
 
   return (
-    <form action={formAction} className="mt-4">
+    <form
+      action={(formData) => {
+        photoPicker.appendTo(formData);
+        formAction(formData);
+      }}
+      className="mt-4"
+    >
       <input type="hidden" name="assetId" value={assetId} />
       <input type="hidden" name="returnTo" value={returnTo ?? ""} />
       <input type="hidden" name="assignmentType" value={assignmentType} />
@@ -178,8 +199,8 @@ export default function AssignAssetForm({
       </div>
 
       {confirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
             <h2 className="text-2xl font-bold text-slate-900">
               Xác nhận bàn giao
             </h2>
@@ -350,6 +371,14 @@ export default function AssignAssetForm({
               />
             </div>
 
+            <div className="mt-4 rounded-xl border border-slate-200 p-3">
+              <HandoverPhotoPicker
+                picker={photoPicker}
+                hint={`Không bắt buộc lúc này — nếu chưa có, phải bổ sung trong ${HANDOVER_PHOTO_DUE_DAYS} ngày ở mục Timeline của thiết bị.`}
+                disabled={isPending}
+              />
+            </div>
+
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
@@ -362,7 +391,7 @@ export default function AssignAssetForm({
               <button
                 type="button"
                 onClick={handleConfirm}
-                disabled={isPending}
+                disabled={isPending || photoPicker.busy}
                 className="rounded-xl bg-blue-600 px-6 py-2.5 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isPending ? "Đang xử lý..." : "Xác nhận"}

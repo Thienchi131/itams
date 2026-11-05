@@ -14,6 +14,13 @@ export const FLASH_MESSAGES: Record<string, string> = {
   asset_repair_completed: "Đã hoàn tất sửa chữa, thiết bị trở về Trong kho.",
   asset_repair_followup: "Đã cập nhật tiến độ sửa chữa.",
   asset_updated: "Đã lưu thông tin thiết bị.",
+  handover_photos_added: "Đã bổ sung ảnh xác nhận bàn giao.",
+  handover_photo_deleted: "Đã xoá ảnh bàn giao.",
+  // Kiểm kê
+  inventory_created: "Đã tạo đợt kiểm kê.",
+  inventory_already_open: "Kho này đang có đợt kiểm kê cùng hạng mục — đã mở đợt đó.",
+  inventory_completed: "Đã hoàn tất đợt kiểm kê.",
+  inventory_cancelled: "Đã huỷ đợt kiểm kê.",
   stock_in_created: "Đã lưu phiếu nhập kho.",
   liquidation_confirmed: "Đã xác nhận thanh lý.",
   // Nhân viên

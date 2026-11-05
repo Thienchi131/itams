@@ -23,6 +23,8 @@ import Panel from "../../components/Panel";
 import AssignAssetForm from "./AssignAssetForm";
 import SendToRepairModal from "./SendToRepairModal";
 import TransferWarehouseForm from "./TransferWarehouseForm";
+import HandoverPhotosBlock from "./HandoverPhotosBlock";
+import { getHandoverPhotoStatus } from "@/modules/asset/handover-photo.helpers";
 import ConfirmTransferButton from "../transfers/ConfirmTransferButton";
 import RejectTransferModal from "../transfers/RejectTransferModal";
 import { prisma } from "@/lib/prisma";
@@ -186,6 +188,13 @@ Vui lòng kiểm tra thiết bị trước khi xác nhận.`;
   const lastReturnHistory = asset.histories.find(
     (h) => h.action === "RETURN"
   );
+
+  // Ảnh xác nhận bàn giao ở Timeline: lượt bàn giao tạo SAU khi có tính năng
+  // (có photoDueAt) luôn bổ sung được. Lượt bàn giao cũ chỉ cho bổ sung nếu
+  // đó là lượt bàn giao hiện hành (thiết bị vẫn đang ở đúng người nhận) —
+  // tránh hiện nút "Bổ sung ảnh" trên mọi dòng bàn giao lịch sử.
+  const latestTransferHistory = asset.histories.find((h) => h.action === "TRANSFER");
+  const photoStatusNow = new Date();
   const lastReturnedFromEmployee = lastReturnHistory
     ? employees.find((e) => e.id === lastReturnHistory.fromEmployeeId)
     : undefined;
@@ -850,6 +859,35 @@ Thiết bị đã được tiếp nhận về kho.`;
                         <p>{history.note ?? "-"}</p>
                       </div>
                     </div>
+
+                    {history.action === "TRANSFER" && history.toEmployeeId !== null && (
+                      <HandoverPhotosBlock
+                        // Đổi key khi số ảnh đổi — sau khi bổ sung/xoá ảnh
+                        // thành công (redirect về lại trang này) khối được
+                        // tạo mới, xoá sạch ảnh đã chọn trong form cũ.
+                        key={`${history.id}-${history.photos.length}`}
+                        historyId={history.id}
+                        returnTo={backHref}
+                        photos={history.photos.map((photo) => ({
+                          id: photo.id,
+                          uploadedBy: photo.uploadedBy,
+                          createdAt: photo.createdAt.toISOString(),
+                        }))}
+                        status={getHandoverPhotoStatus(
+                          history.photoDueAt,
+                          history.photos.length,
+                          photoStatusNow
+                        )}
+                        photoDueAt={history.photoDueAt?.toISOString() ?? null}
+                        canUpload={
+                          canManageAsset &&
+                          (history.photoDueAt !== null ||
+                            (history.id === latestTransferHistory?.id &&
+                              asset.currentEmployeeId === history.toEmployeeId))
+                        }
+                        canDelete={isAdmin}
+                      />
+                    )}
                   </div>
                 );
               })}

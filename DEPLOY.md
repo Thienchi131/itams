@@ -88,6 +88,23 @@ docker compose up -d
 
 Migration mới (nếu có) sẽ tự chạy lại qua entrypoint, an toàn để chạy nhiều lần (`migrate deploy` bỏ qua migration đã áp dụng rồi).
 
+## Ảnh xác nhận bàn giao thiết bị (thư mục `uploads/`)
+
+Ảnh bàn giao được lưu dạng file trên đĩa VPS tại `~/itams/uploads` (bind-mount vào container ở `/app/uploads`, xem `docker-compose.yml`) — **không** nằm trong database. Ảnh đã được nén tự động trên điện thoại (~200–400 KB/ảnh).
+
+**Làm 1 lần trước lần deploy đầu tiên có tính năng này** (nếu bỏ qua, Docker tự tạo thư mục thuộc `root` và app không ghi được ảnh):
+
+```bash
+cd ~/itams
+mkdir -p uploads
+sudo chown -R 1001:1001 uploads   # container chạy bằng user "nextjs" uid 1001
+```
+
+Sau đó deploy như mục 6 (`git pull`, `docker compose build`, `docker compose up -d`) — migration `handover_photos` tự chạy qua entrypoint.
+
+- Kiểm tra dung lượng: `du -sh ~/itams/uploads` và `df -h`.
+- Backup: `scripts/backup-pull-to-mac.sh` (chạy trên máy Mac) kéo cả thư mục ảnh về `~/itams-uploads`. Khôi phục database từ backup **không** khôi phục ảnh — ảnh nào thiếu file sẽ hiện ảnh vỡ, các ảnh còn lại vẫn xem bình thường.
+
 ## Backup database (nên làm định kỳ)
 
 ```bash

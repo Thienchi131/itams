@@ -12,3 +12,6 @@ npm-debug.log*
 # build context/image layer. Bind-mount trực tiếp ra ~/itams/backups trên
 # VPS (xem docker-compose.yml), không cần COPY vào image lúc build.
 backups
+
+# Ảnh xác nhận bàn giao — bind-mount ~/itams/uploads, không COPY vào image.
+uploads

@@ -46,6 +46,7 @@ model User {
   // cần 1 danh sách nhiều-nhiều riêng — xem getCurrentUser() để biết cách
   // cộng dồn vào regionWarehouseIds lúc tính phạm vi xem.
   warehouseAccess        UserWarehouseAccess[]
+  inventoryAuditParticipations InventoryAuditParticipant[]
 
   @@index([regionId])
   @@index([warehouseId])
@@ -152,6 +153,7 @@ model Warehouse {
   // khác không tên tới Warehouse (qua warehouseId) rồi, Prisma bắt buộc
   // phải đặt tên khi có quan hệ thứ 2 cùng cặp model.
   pendingTransferAssets Asset[] @relation("AssetPendingTransfer")
+  inventoryAudits InventoryAudit[]
 
   @@index([regionId])
 }
@@ -265,6 +267,7 @@ model Asset {
   stockInItems      StockInItem[]
   stockOutItems     StockOutItem[]
   repairFollowUps   RepairFollowUp[]
+  inventoryAuditItems InventoryAuditItem[]
 
   @@index([assetTag])
   @@index([serialNumber])
@@ -376,11 +379,41 @@ model AssetHistory {
   note            String?
   createdBy       String?
   createdAt       DateTime       @default(now())
+  // Hạn bổ sung ảnh xác nhận bàn giao — chỉ set cho dòng action=TRANSFER tạo
+  // từ luồng bàn giao (assignAssetAction/assignAdditionalAssetAction) KỂ TỪ
+  // khi có tính năng ảnh bàn giao (= createdAt + 7 ngày). Ảnh không bắt buộc
+  // lúc bàn giao nhưng phải bổ sung trước hạn này. null = không áp dụng (các
+  // lượt bàn giao cũ trước khi có tính năng, hoặc thao tác khác) — cố tình
+  // KHÔNG backfill, tránh hàng nghìn lượt bàn giao cũ đột nhiên bị báo "quá
+  // hạn thiếu ảnh". Xem src/modules/asset/handover-photo.*.
+  photoDueAt      DateTime?
   asset           Asset          @relation(fields: [assetId], references: [id])
+  photos          AssetHistoryPhoto[]
 
   @@index([assetId])
   @@index([action])
   @@index([createdAt])
+  @@index([photoDueAt])
+}
+
+// Ảnh xác nhận bàn giao thiết bị — file JPEG (đã nén ở trình duyệt, xem
+// HandoverPhotoPicker.tsx) lưu trên đĩa VPS (thư mục uploads/, bind-mount ra
+// ngoài container, xem docker-compose.yml), DB chỉ lưu tên file. Chỉ phục vụ
+// qua route /handover-photos/[id] có kiểm tra đăng nhập + phạm vi kho, KHÔNG
+// nằm trong public/. fileName KHÔNG unique: cấp HÀNG LOẠT nhiều thiết bị 1
+// lượt chỉ ghi file 1 lần, nhiều dòng ảnh (mỗi thiết bị 1 dòng) cùng trỏ vào
+// 1 file — xoá file thật chỉ khi không còn dòng nào trỏ tới.
+model AssetHistoryPhoto {
+  id         Int          @id @default(autoincrement())
+  historyId  Int
+  fileName   String
+  sizeBytes  Int
+  uploadedBy String?
+  createdAt  DateTime     @default(now())
+  history    AssetHistory @relation(fields: [historyId], references: [id], onDelete: Cascade)
+
+  @@index([historyId])
+  @@index([fileName])
 }
 
 model AssetAssignment {
@@ -637,4 +670,81 @@ enum AssignmentType {
 enum AssetModelTag {
   OK
   BACKUP
+}
+
+// ===== Kiểm kê kho =====
+// 1 "đợt kiểm kê" cho 1 kho + 1 hạng mục (tài sản Trong kho HOẶC tài sản Chờ
+// thanh lý). Lúc tạo đợt, danh sách thiết bị được CHỤP LẠI (snapshot) thành
+// các InventoryAuditItem — IT tìm đúng máy ngoài thực tế rồi chụp ảnh trực
+// tiếp (S/N + máy) để xác nhận còn hiện hữu. Hoàn tất đợt: máy chưa xác nhận
+// được tính là "Thiếu" trong báo cáo, KHÔNG tự đổi trạng thái thiết bị.
+enum InventoryAuditScope {
+  // status IN_STOCK tại kho
+  IN_STOCK
+  // status RETIRED + liquidatedAt null ("Chờ thanh lý") tại kho
+  PENDING_LIQUIDATION
+}
+
+enum InventoryAuditStatus {
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model InventoryAudit {
+  id             Int                  @id @default(autoincrement())
+  // SetNull + lưu sẵn tên kho (warehouseLabel): xoá kho (đã trống) không làm
+  // mất lịch sử kiểm kê, cũng không bị FK chặn ở deleteWarehouseAction.
+  warehouseId    Int?
+  warehouseLabel String
+  scope          InventoryAuditScope
+  status         InventoryAuditStatus @default(IN_PROGRESS)
+  note           String?
+  createdBy      String?
+  createdAt      DateTime             @default(now())
+  completedAt    DateTime?
+  completedBy    String?
+  warehouse      Warehouse?           @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
+  items          InventoryAuditItem[]
+  participants   InventoryAuditParticipant[]
+
+  @@index([warehouseId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model InventoryAuditItem {
+  id             Int            @id @default(autoincrement())
+  auditId        Int
+  // SetNull: xoá thiết bị (deleteAssetAction) không bị FK chặn, báo cáo cũ
+  // vẫn còn nhờ các field snapshot bên dưới.
+  assetId        Int?
+  assetTag       String
+  serialNumber   String
+  modelLabel     String
+  // Xác nhận hiện hữu = đã có ảnh chụp trực tiếp. Chụp lại thì ghi đè.
+  confirmedAt    DateTime?
+  confirmedBy    String?
+  photoFileName  String?
+  photoSizeBytes Int?
+  audit          InventoryAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  asset          Asset?         @relation(fields: [assetId], references: [id], onDelete: SetNull)
+
+  @@unique([auditId, assetId])
+  @@index([auditId])
+  @@index([assetId])
+}
+
+// IT được chỉ định tham gia 1 đợt kiểm kê — CHỈ những IT này (cùng Admin)
+// thấy và thao tác được đợt đó. Chọn lúc tạo đợt, trong số IT có phạm vi kho
+// bao gồm kho được kiểm kê. Xoá tài khoản thì tự xoá dòng tham gia (Cascade).
+model InventoryAuditParticipant {
+  auditId   Int
+  userId    Int
+  createdAt DateTime       @default(now())
+  audit     InventoryAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([auditId, userId])
+  @@index([userId])
 }

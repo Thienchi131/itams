@@ -16,10 +16,14 @@ import {
   Truck,
   Menu,
   ScanLine,
+  ImageIcon,
+  ClipboardCheck,
 } from "lucide-react";
 
 import { requireLogin } from "@/modules/auth/auth.service";
-import { canAccessMenu, ROLE_IT } from "@/modules/auth/permissions";
+import { canAccessMenu, canEditData, ROLE_IT } from "@/modules/auth/permissions";
+import { countEmployeesWithOverdueHandoverPhotos } from "@/modules/asset/handover-photo.service";
+import { HANDOVER_PHOTO_DUE_DAYS } from "@/modules/asset/handover-photo.helpers";
 import { logoutAction } from "@/app/logout/actions";
 import {
   getAssetsInRepair,
@@ -71,6 +75,15 @@ export default async function AppLayout({
   const pendingTransfers = await getPendingIncomingTransfers(
     user.regionWarehouseIds
   );
+
+  // Banner nhắc nhân viên có thiết bị bàn giao đã QUÁ HẠN 7 ngày mà vẫn
+  // chưa có ảnh xác nhận — đếm theo NHÂN VIÊN (không theo từng thiết bị),
+  // chỉ Admin/IT (người bổ sung được ảnh), theo phạm vi kho. Chỉ nhắc khi đã
+  // quá hạn để banner không hiện sau MỌI lượt bàn giao; danh sách đầy đủ ở
+  // /assets/handover-photos.
+  const overdueHandoverPhotoCount = canEditData(roleName)
+    ? await countEmployeesWithOverdueHandoverPhotos(user.regionWarehouseIds)
+    : 0;
 
   // Banner "to" cho kho NGUỒN khi 1 lượt chuyển đi bị kho đích từ chối —
   // trước đây chỉ có trong chuông thông báo (NotificationBell), user phản
@@ -154,6 +167,14 @@ export default async function AppLayout({
               href="/scan"
               icon={<ScanLine size={18} />}
               label="Quét mã thiết bị"
+            />
+          )}
+
+          {canAccessMenu(roleName, "inventory") && (
+            <AppMenuLink
+              href="/inventory"
+              icon={<ClipboardCheck size={18} />}
+              label="Kiểm kê kho"
             />
           )}
 
@@ -311,6 +332,25 @@ export default async function AppLayout({
               className="shrink-0 rounded-lg bg-violet-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-violet-700"
             >
               Xác nhận ngay
+            </Link>
+          </div>
+        )}
+
+        {overdueHandoverPhotoCount > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-6 py-3">
+            <div className="flex items-center gap-2.5 text-amber-800">
+              <ImageIcon size={18} className="shrink-0" />
+              <p className="text-sm font-semibold">
+                Có {overdueHandoverPhotoCount} nhân viên nhận thiết bị đã quá{" "}
+                {HANDOVER_PHOTO_DUE_DAYS} ngày nhưng chưa có ảnh xác nhận bàn giao.
+              </p>
+            </div>
+
+            <Link
+              href="/assets/handover-photos"
+              className="shrink-0 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-amber-700"
+            >
+              Bổ sung ngay
             </Link>
           </div>
         )}

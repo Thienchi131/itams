@@ -152,6 +152,11 @@ export default async function EmployeeDetailPage({
 
           {canEdit ? (
             <EmployeeAssetsPanel
+              // Remount khi danh sách thiết bị đang giữ thay đổi (sau khi cấp
+              // thêm/thu hồi/chuyển thành công — action redirect về lại đúng
+              // trang này nên state client không tự reset): đóng modal, xoá
+              // lựa chọn cũ + ảnh đã chọn, tránh bấm gửi lại lần 2.
+              key={employee.assets.map((asset) => asset.id).join(",")}
               employeeId={employee.id}
               assets={employee.assets}
               availableAssets={availableAssets}

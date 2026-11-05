@@ -356,6 +356,10 @@ export async function getAssetById(id: number) {
         // hay không (hasMore), không cần load hết lịch sử của thiết bị cũ có
         // thể lên tới hàng trăm dòng.
         take: 11,
+        // Ảnh xác nhận bàn giao — hiển thị ngay dưới dòng Bàn giao ở Timeline.
+        include: {
+          photos: { orderBy: { id: "asc" } },
+        },
       },
     },
   });

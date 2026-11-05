@@ -12,6 +12,13 @@ import {
 } from "./actions";
 import ReturnWarehouseSelect from "@/app/components/ReturnWarehouseSelect";
 import type { WarehouseOption } from "@/modules/warehouse/return-destination";
+import HandoverPhotoPicker, {
+  useHandoverPhotoPicker,
+} from "@/app/components/HandoverPhotoPicker";
+import {
+  HANDOVER_PHOTO_DUE_DAYS,
+  HANDOVER_PHOTO_MAX_COUNT,
+} from "@/modules/asset/handover-photo.helpers";
 
 type AssetItem = {
   id: number;
@@ -594,6 +601,10 @@ function AssignModal({
     FormData
   >(assignAdditionalAssetAction, null);
 
+  // Ảnh xác nhận bàn giao (không bắt buộc) — cấp nhiều máy 1 lượt thì bộ ảnh
+  // áp dụng chung cho cả lô.
+  const photoPicker = useHandoverPhotoPicker(HANDOVER_PHOTO_MAX_COUNT);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return availableAssets;
@@ -634,7 +645,13 @@ function AssignModal({
       desc="Chọn 1 hoặc nhiều thiết bị đang Trong kho để cấp phát cùng lúc cho nhân viên này."
       onClose={onClose}
     >
-      <form action={formAction} className="mt-5 space-y-5">
+      <form
+        action={(formData) => {
+          photoPicker.appendTo(formData);
+          formAction(formData);
+        }}
+        className="mt-5 space-y-5"
+      >
         <input type="hidden" name="employeeId" value={employeeId} />
         <input
           type="hidden"
@@ -802,6 +819,14 @@ function AssignModal({
           />
         </div>
 
+        <div className="rounded-lg border p-4">
+          <HandoverPhotoPicker
+            picker={photoPicker}
+            hint={`Không bắt buộc lúc này — nếu chưa có, phải bổ sung trong ${HANDOVER_PHOTO_DUE_DAYS} ngày ở Timeline từng thiết bị. Cấp nhiều máy 1 lượt thì ảnh áp dụng chung cho cả lô.`}
+            disabled={isPending}
+          />
+        </div>
+
         <div className="flex justify-end gap-3">
           <button
             type="button"
@@ -817,6 +842,7 @@ function AssignModal({
               selectedAssetIds.length === 0 ||
               !assignmentType ||
               isPending ||
+              photoPicker.busy ||
               (assignmentType === "EXCHANGE" &&
                 (selectedAssetIds.length > 1 || !exchangeAssetId))
             }

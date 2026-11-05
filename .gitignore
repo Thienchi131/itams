@@ -38,6 +38,9 @@ yarn-error.log*
 # file dump DB thật (dù đã mã hoá AES-256-GCM), không được để lọt vào git.
 /backups/
 
+# ảnh xác nhận bàn giao thiết bị (dữ liệu thật, có thể chứa mặt người/chữ ký)
+/uploads/
+
 # vercel
 .vercel
 

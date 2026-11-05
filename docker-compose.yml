@@ -61,6 +61,12 @@ services:
       # 1001), khác user "it-hd" sở hữu thư mục trên host, nếu không nới
       # quyền thì app không tạo/xoá file backup được (403/EACCES).
       - ./backups:/app/backups
+      # Ảnh xác nhận bàn giao thiết bị (src/modules/asset/handover-photo.*) —
+      # PHẢI nằm ngoài container, nếu không mỗi lần build/deploy lại là mất
+      # sạch ảnh. Trước lần deploy đầu tiên có tính năng này, chạy 1 lần trên
+      # VPS: `mkdir -p ~/itams/uploads && sudo chown -R 1001:1001 ~/itams/uploads`
+      # (container chạy bằng user "nextjs" uid 1001 — xem DEPLOY.md).
+      - ./uploads:/app/uploads
     # App Node.js/Next.js không cần BẤT KỲ Linux capability đặc quyền nào để
     # chạy bình thường (không mở cổng <1024, không đổi owner file, không
     # đụng network interface...) — chạy sẵn bằng user "nextjs" không phải

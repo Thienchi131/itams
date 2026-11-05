@@ -27,6 +27,11 @@ SSH_KEY="$HOME/.ssh/itams_backup_pull"
 REMOTE_DIR="~/itams/backups/"
 LOCAL_DIR="$HOME/itams-backups"
 LOG_FILE="$LOCAL_DIR/pull.log"
+# Ảnh xác nhận bàn giao thiết bị — là FILE trên đĩa VPS, KHÔNG nằm trong file
+# backup database ở trên, nên phải kéo riêng. Không dùng --delete (giống
+# backup DB): ảnh Admin lỡ xoá trên web vẫn còn bản ở máy Mac.
+REMOTE_UPLOADS_DIR="~/itams/uploads/"
+LOCAL_UPLOADS_DIR="$HOME/itams-uploads"
 
 # --- Báo cáo lên webapp — ĐIỀN REPORT_TOKEN trước khi dùng (lấy từ
 # BACKUP_PULL_REPORT_TOKEN trong .env trên VPS) ---
@@ -34,7 +39,7 @@ REPORT_URL="https://itam.applesmng.com/api/backup-pull/report"
 REPORT_TOKEN="DIEN_BACKUP_PULL_REPORT_TOKEN_VAO_DAY"
 SOURCE_NAME="Mac backup ($(hostname -s 2>/dev/null || hostname))"
 
-mkdir -p "$LOCAL_DIR"
+mkdir -p "$LOCAL_DIR" "$LOCAL_UPLOADS_DIR"
 
 echo "[$(date)] Bắt đầu kéo backup từ VPS..." >>"$LOG_FILE"
 
@@ -44,6 +49,20 @@ RSYNC_OUTPUT=$(rsync -avz \
 RSYNC_EXIT=$?
 
 echo "$RSYNC_OUTPUT" >>"$LOG_FILE"
+
+# Ảnh JPEG đã nén sẵn — không cần -z (nén lại chỉ tốn CPU, không nhỏ hơn).
+UPLOADS_OUTPUT=$(rsync -av \
+  -e "ssh -p $VPS_PORT -i $SSH_KEY -o BatchMode=yes -o ConnectTimeout=15" \
+  "$VPS_HOST:$REMOTE_UPLOADS_DIR" "$LOCAL_UPLOADS_DIR/" 2>&1)
+UPLOADS_EXIT=$?
+
+echo "$UPLOADS_OUTPUT" >>"$LOG_FILE"
+
+# Thư mục ảnh chưa tồn tại trên VPS (chưa deploy tính năng / chưa có ảnh nào)
+# thì rsync báo mã 23 — không coi là lỗi của cả lượt backup.
+if [ "$UPLOADS_EXIT" -ne 0 ] && [ "$UPLOADS_EXIT" -ne 23 ] && [ "$RSYNC_EXIT" -eq 0 ]; then
+  RSYNC_EXIT=$UPLOADS_EXIT
+fi
 
 TOTAL=$(find "$LOCAL_DIR" -maxdepth 1 -name "itams_db_*.sql.gz*" | wc -l | tr -d ' ')
 

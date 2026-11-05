@@ -19,8 +19,12 @@ const nextConfig: NextConfig = {
   // Trước đây không set header bảo mật nào — thêm 1 lớp phòng thủ chuẩn cho
   // mọi response: chặn clickjacking (X-Frame-Options/frame-ancestors), chặn
   // MIME-sniffing, hạn chế thông tin Referrer rò ra domain khác, và tắt bớt
-  // các API trình duyệt nhạy cảm (camera/mic/geolocation) mà app này không
-  // dùng tới. Không thêm Strict-Transport-Security ở đây vì site hiện chạy
+  // các API trình duyệt nhạy cảm (mic/geolocation) mà app này không dùng tới.
+  // Camera: chỉ cho CHÍNH site này dùng (trang /scan quét QR/mã vạch bằng
+  // ZXing qua getUserMedia) — "camera=()" trước đây chặn cả chính site, chỉ
+  // chạy được trên Safari iPhone vì Safari bỏ qua header này; Chrome/Edge
+  // (Android, máy tính) sẽ từ chối mở camera. "(self)" vẫn chặn iframe/site
+  // khác nhúng vào. Không thêm Strict-Transport-Security ở đây vì site hiện chạy
   // HTTP thuần (chưa gắn SSL) — bật HSTS trước khi có HTTPS sẽ khiến trình
   // duyệt từ chối kết nối lại qua HTTP, tự làm sập truy cập của chính mình.
   async headers() {
@@ -33,7 +37,7 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           {
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=()",
+            value: "camera=(self), microphone=(), geolocation=()",
           },
           { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
         ],

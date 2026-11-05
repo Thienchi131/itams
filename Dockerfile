@@ -96,6 +96,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
 
+# Thư mục ảnh xác nhận bàn giao — trên VPS được bind-mount đè bằng
+# ~/itams/uploads (docker-compose.yml). Tạo sẵn + đúng owner để nếu lỡ chạy
+# không có mount thì app vẫn ghi được (chỉ là ảnh sẽ mất khi build lại).
+RUN mkdir -p /app/uploads && chown nextjs:nodejs /app/uploads
+
 USER nextjs
 
 EXPOSE 3000

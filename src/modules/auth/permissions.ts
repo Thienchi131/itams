@@ -9,6 +9,7 @@ export type MenuKey =
   | "supplies"
   | "employees"
   | "reports"
+  | "inventory"
   | "users"
   | "settings";
 
@@ -35,6 +36,9 @@ const MENU_ACCESS: Record<MenuKey, string[]> = {
   // để tra cứu, giống lý do /activity mở cho mọi role đã áp dụng trước đó),
   // không có thao tác ghi nào ở trang này nên không cần canEditData().
   reports: [ROLE_ADMIN, ROLE_IT, ROLE_USER],
+  // Kiểm kê kho — chỉ người thao tác kho (Admin/IT) tạo đợt + chụp xác nhận;
+  // User (viewer) không tham gia kiểm kê.
+  inventory: [ROLE_ADMIN, ROLE_IT],
   users: [ROLE_ADMIN],
   // Cài đặt gồm toàn cấu hình hệ thống nhạy cảm (Kho, Khu vực, Whitelist
   // IP...) — trước đây IT cũng thấy menu này dù hầu hết card bên trong đã bị

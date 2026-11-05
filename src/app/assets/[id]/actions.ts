@@ -12,6 +12,13 @@ import {
   REJECTED_TRANSFER_NOTE_PREFIX,
 } from "@/modules/asset/asset.helpers";
 import { resolveReturnWarehouse } from "@/modules/warehouse/return-destination";
+import {
+  extractHandoverPhotos,
+  removeHandoverPhotoFileIfUnreferenced,
+  removeHandoverPhotoFiles,
+  trySaveHandoverPhotoFiles,
+} from "@/modules/asset/handover-photo.service";
+import { computeHandoverPhotoDueAt } from "@/modules/asset/handover-photo.helpers";
 
 // Chấp nhận đúng các giá trị của enum AssignmentType — validate ở server
 // (không chỉ tin theo UI) phòng request bị gọi thẳng với giá trị lạ.
@@ -108,6 +115,14 @@ export async function assignAssetAction(
     return { error: "Vui lòng chọn thiết bị cần thu hồi để đổi." };
   }
 
+  // Ảnh xác nhận bàn giao — KHÔNG bắt buộc lúc bàn giao (bổ sung được trong
+  // 7 ngày sau ở Timeline), nhưng nếu có gửi kèm thì phải hợp lệ. Kiểm tra
+  // trước khi đụng DB, chỉ ghi file xuống đĩa ngay trước transaction.
+  const photos = await extractHandoverPhotos(formData);
+  if (!photos.ok) {
+    return { error: photos.error };
+  }
+
   const asset = await prisma.asset.findUnique({
     where: { id: assetId },
     include: { accessories: true },
@@ -193,68 +208,92 @@ export async function assignAssetAction(
     ? ` | Đổi lấy máy cũ: ${exchangeAsset.assetTag}`
     : "";
 
+  // Ghi ảnh xuống đĩa TRƯỚC transaction (không làm I/O file bên trong
+  // transaction DB) — nếu transaction lỗi thì xoá lại file vừa ghi ở catch
+  // bên dưới, không để file mồ côi.
+  const savedResult = await trySaveHandoverPhotoFiles(photos.buffers);
+  if (!savedResult.ok) {
+    return { error: savedResult.error };
+  }
+  const savedPhotos = savedResult.saved;
+
   // Cả 2 thiết bị (máy mới bàn giao + máy cũ bị thu hồi) phải cùng thành
   // công hoặc cùng rollback — tránh trường hợp lỗi giữa chừng khiến nhân
   // viên bị gán CẢ 2 máy cùng lúc (mất tích máy cũ khỏi Timeline thu hồi).
-  await prisma.$transaction(async (tx) => {
-    await tx.asset.update({
-      where: { id: assetId },
-      data: {
-        status: AssetStatus.ASSIGNED,
-        currentEmployeeId: employeeId,
-        assignmentType,
-        assignmentDueAt,
-      },
-    });
-
-    if (accessoriesToAdd.length > 0) {
-      await tx.assetAccessory.createMany({ data: accessoriesToAdd });
-    }
-
-    await tx.assetHistory.create({
-      data: {
-        assetId,
-        action: HistoryAction.TRANSFER,
-        fromEmployeeId: asset.currentEmployeeId,
-        toEmployeeId: employeeId,
-        fromWarehouseId: asset.warehouseId,
-        toWarehouseId: asset.warehouseId,
-        // Snapshot đúng loại cấp phát của LƯỢT bàn giao này — dùng cho thống
-        // kê "SL theo loại phiếu" ở trang Báo cáo (report.service.ts).
-        assignmentType,
-        note: `Bàn giao thiết bị (${ASSIGNMENT_TYPE_LABEL[assignmentType]})${addedNote}${exchangeNoteForNewAsset}${
-          noteInput ? ` | ${noteInput}` : ""
-        }`,
-        createdBy: currentUser.fullName,
-      },
-    });
-
-    if (exchangeAsset && exchangeDestinationWarehouseId !== null) {
+  try {
+    await prisma.$transaction(async (tx) => {
       await tx.asset.update({
-        where: { id: exchangeAsset.id },
+        where: { id: assetId },
         data: {
-          status: AssetStatus.IN_STOCK,
-          currentEmployeeId: null,
-          warehouseId: exchangeDestinationWarehouseId,
-          assignmentType: null,
-          assignmentDueAt: null,
+          status: AssetStatus.ASSIGNED,
+          currentEmployeeId: employeeId,
+          assignmentType,
+          assignmentDueAt,
         },
       });
+
+      if (accessoriesToAdd.length > 0) {
+        await tx.assetAccessory.createMany({ data: accessoriesToAdd });
+      }
 
       await tx.assetHistory.create({
         data: {
-          assetId: exchangeAsset.id,
-          action: HistoryAction.RETURN,
-          fromEmployeeId: employeeId,
-          toEmployeeId: null,
-          fromWarehouseId: exchangeAsset.warehouseId,
-          toWarehouseId: exchangeDestinationWarehouseId,
-          note: `Thu hồi do Cấp đổi thiết bị — đổi sang máy mới: ${asset.assetTag}`,
+          assetId,
+          action: HistoryAction.TRANSFER,
+          fromEmployeeId: asset.currentEmployeeId,
+          toEmployeeId: employeeId,
+          fromWarehouseId: asset.warehouseId,
+          toWarehouseId: asset.warehouseId,
+          // Snapshot đúng loại cấp phát của LƯỢT bàn giao này — dùng cho thống
+          // kê "SL theo loại phiếu" ở trang Báo cáo (report.service.ts).
+          assignmentType,
+          note: `Bàn giao thiết bị (${ASSIGNMENT_TYPE_LABEL[assignmentType]})${addedNote}${exchangeNoteForNewAsset}${
+            noteInput ? ` | ${noteInput}` : ""
+          }`,
           createdBy: currentUser.fullName,
+          // Hạn bổ sung ảnh xác nhận bàn giao (7 ngày) — áp dụng cả khi đã gửi
+          // kèm ảnh ngay lúc này (khi đó trạng thái hiển thị là "Đã có ảnh").
+          photoDueAt: computeHandoverPhotoDueAt(),
+          photos: {
+            create: savedPhotos.map((photo) => ({
+              fileName: photo.fileName,
+              sizeBytes: photo.sizeBytes,
+              uploadedBy: currentUser.fullName,
+            })),
+          },
         },
       });
-    }
-  });
+
+      if (exchangeAsset && exchangeDestinationWarehouseId !== null) {
+        await tx.asset.update({
+          where: { id: exchangeAsset.id },
+          data: {
+            status: AssetStatus.IN_STOCK,
+            currentEmployeeId: null,
+            warehouseId: exchangeDestinationWarehouseId,
+            assignmentType: null,
+            assignmentDueAt: null,
+          },
+        });
+
+        await tx.assetHistory.create({
+          data: {
+            assetId: exchangeAsset.id,
+            action: HistoryAction.RETURN,
+            fromEmployeeId: employeeId,
+            toEmployeeId: null,
+            fromWarehouseId: exchangeAsset.warehouseId,
+            toWarehouseId: exchangeDestinationWarehouseId,
+            note: `Thu hồi do Cấp đổi thiết bị — đổi sang máy mới: ${asset.assetTag}`,
+            createdBy: currentUser.fullName,
+          },
+        });
+      }
+    });
+  } catch (error) {
+    await removeHandoverPhotoFiles(savedPhotos.map((photo) => photo.fileName));
+    throw error;
+  }
 
   redirect(withFlash(detailUrl(assetId, returnTo), "asset_assigned"));
 }
@@ -913,6 +952,16 @@ export async function deleteAssetAction(
 
   const assetLabel = `${asset.assetTag} — ${asset.model.brand} ${asset.model.modelName} (SN: ${asset.serialNumber})`;
 
+  // Ảnh bàn giao của thiết bị: dòng DB tự xoá theo AssetHistory (cascade),
+  // nhưng FILE trên đĩa thì không — lấy danh sách trước, xoá file sau khi
+  // transaction thành công (file dùng chung với thiết bị khác cùng lô thì giữ).
+  const photoFileNames = (
+    await prisma.assetHistoryPhoto.findMany({
+      where: { history: { assetId } },
+      select: { fileName: true },
+    })
+  ).map((photo) => photo.fileName);
+
   // Asset không có onDelete: Cascade ở các bảng con (cố tình, để tránh mất
   // dữ liệu ngoài ý muốn ở những chỗ khác) — phải tự xoá hết bản ghi liên
   // quan trong 1 transaction trước khi xoá Asset, nếu không Prisma sẽ báo
@@ -926,6 +975,10 @@ export async function deleteAssetAction(
     prisma.stockOutItem.deleteMany({ where: { assetId } }),
     prisma.asset.delete({ where: { id: assetId } }),
   ]);
+
+  for (const fileName of new Set(photoFileNames)) {
+    await removeHandoverPhotoFileIfUnreferenced(fileName);
+  }
 
   // Ghi vào AuditLog thay vì AssetHistory — AssetHistory của chính thiết bị
   // này vừa bị xoá sạch cùng lúc, ghi vào đó thì mất luôn bằng chứng, không

@@ -379,6 +379,13 @@ export default async function AssetsPage({
   </Link>
 
   <Link
+    href="/assets/handover-photos"
+    className="rounded-lg border border-amber-200 bg-white px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+  >
+    Ảnh bàn giao chờ bổ sung
+  </Link>
+
+  <Link
     href="/assets/liquidation"
     className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
   >

@@ -63,3 +63,9 @@ test("getDefaultRouteForRole đá về '/' nếu vào được dashboard, ngư�
   assert.equal(getDefaultRouteForRole(ROLE_USER), "/");
   assert.equal(getDefaultRouteForRole("KhongTonTai"), "/assets");
 });
+
+test("Kiểm kê chỉ dành cho Admin và IT", () => {
+  assert.equal(canAccessMenu(ROLE_ADMIN, "inventory"), true);
+  assert.equal(canAccessMenu(ROLE_IT, "inventory"), true);
+  assert.equal(canAccessMenu(ROLE_USER, "inventory"), false);
+});
