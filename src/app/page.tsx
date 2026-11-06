@@ -13,7 +13,7 @@ import {
   Smartphone,
   KeyRound,
   Tv,
-  UserRound,
+  ArchiveRestore,
   Wrench,
   PackageSearch,
   Calendar,
@@ -160,7 +160,7 @@ export default async function Home({
 
   const [
     totalAssets,
-    assignedAssets,
+    backupInStockCount,
     inStockAssets,
     repairAssets,
     employeeCount,
@@ -176,7 +176,12 @@ export default async function Home({
     categoryLookup,
   ] = await Promise.all([
     prisma.asset.count({ where: warehouseFilter }),
-    prisma.asset.count({ where: { ...warehouseFilter, status: "ASSIGNED" } }),
+    // Thiết bị BACKUP còn trong kho — model gắn tag "BACKUP" (Cài đặt > Tag
+    // Model), trạng thái Trong kho, theo kho/khu vực đang xem. Thay cho thẻ
+    // "Đã cấp phát" trước đây.
+    prisma.asset.count({
+      where: { ...warehouseFilter, status: "IN_STOCK", model: { tag: "BACKUP" } },
+    }),
     prisma.asset.count({ where: { ...warehouseFilter, status: "IN_STOCK" } }),
     prisma.asset.count({ where: { ...warehouseFilter, status: "REPAIR" } }),
     // Số nhân viên đang giữ ít nhất 1 thiết bị trong phạm vi được xem — Employee
@@ -339,6 +344,7 @@ export default async function Home({
     adapter?: string;
     cable?: string;
     categoryId?: number | null;
+    modelTag?: "BACKUP";
   }) {
     const parts = [
       params.status ? `status=${params.status}` : "",
@@ -346,6 +352,7 @@ export default async function Home({
       params.adapter ? `adapter=${params.adapter}` : "",
       params.cable ? `cable=${params.cable}` : "",
       params.categoryId ? `categoryId=${params.categoryId}` : "",
+      params.modelTag ? `modelTag=${params.modelTag}` : "",
       scopeQuery,
     ].filter(Boolean);
 
@@ -415,11 +422,11 @@ export default async function Home({
         ))}
 
         <DashboardCard
-          icon={<UserRound size={20} />}
-          label="Đã cấp phát"
-          value={assignedAssets}
+          icon={<ArchiveRestore size={20} />}
+          label="Thiết bị backup"
+          value={backupInStockCount}
           color="teal"
-          href={assetsLink({ status: "ASSIGNED" })}
+          href={assetsLink({ status: "IN_STOCK", modelTag: "BACKUP" })}
         />
 
         <DashboardCard

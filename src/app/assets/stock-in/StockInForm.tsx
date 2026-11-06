@@ -2,8 +2,9 @@
 
 import { createStockInAction, checkDuplicateSerialsAction, type StockInState } from "./actions";
 import Link from "next/link";
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useCallback, useMemo, useState } from "react";
 import ModelSearchSelect from "./ModelSearchSelect";
+import SerialScannerModal from "./SerialScannerModal";
 import EmployeeSelect from "../../components/EmployeeSelect";
 import QuickAddEmployeeModal from "./QuickAddEmployeeModal";
 import {
@@ -23,6 +24,7 @@ import {
   Trash2,
   UserRoundSearch,
   MessageSquareText,
+  ScanLine,
 } from "lucide-react";
 
 const SERIAL_MAX_LENGTH = 16;
@@ -124,6 +126,8 @@ export default function StockInForm({
   // Chỉ hiện lỗi "thiếu Serial" SAU khi user đã bấm Lưu ít nhất 1 lần — tránh
   // báo đỏ ngay từ lúc mới mở form (ô Serial nào cũng trống mặc định).
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  // Dòng model đang mở camera quét Serial (null = không quét).
+  const [scanLineKey, setScanLineKey] = useState<string | null>(null);
   const [state, formAction, isPending] = useActionState<StockInState, FormData>(
     createStockInAction,
     null
@@ -215,6 +219,30 @@ export default function StockInForm({
       })
     );
   }
+
+  // Thêm 1 serial vừa quét vào dòng: điền vào ô trống đầu tiên, hết ô trống
+  // thì thêm ô mới.
+  const addScannedSerial = useCallback((lineKey: string, serial: string) => {
+    setLines((prev) =>
+      prev.map((line) => {
+        if (line.key !== lineKey) return line;
+        const value = serial.slice(0, SERIAL_MAX_LENGTH);
+        const emptyIndex = line.serials.findIndex((s) => s.trim() === "");
+        if (emptyIndex >= 0) {
+          return {
+            ...line,
+            serials: line.serials.map((s, i) => (i === emptyIndex ? value : s)),
+          };
+        }
+        return { ...line, serials: [...line.serials, value] };
+      })
+    );
+  }, []);
+
+  const checkSerialsInSystem = useCallback(async (serials: string[]) => {
+    const result = await checkDuplicateSerialsAction(serials);
+    return result.existingInSystem;
+  }, []);
 
   // Kiểm tra trùng dựa trên TOÀN BỘ serial của mọi dòng cộng lại — 1 phiếu
   // giờ có thể có nhiều model nên phải gộp chung mới phát hiện được trùng
@@ -729,11 +757,22 @@ export default function StockInForm({
                 >
                   <Plus size={16} />
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setScanLineKey(line.key)}
+                  className="flex h-[38px] items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700"
+                  title="Quét mã vạch / QR Serial bằng camera"
+                >
+                  <ScanLine size={16} />
+                  Quét mã
+                </button>
               </div>
 
               <p className="mt-2 text-xs text-slate-400">
                 Tối đa {SERIAL_MAX_LENGTH} ký tự mỗi ô. Có thể dán (Ctrl+V) nhiều
-                serial cùng lúc — sẽ tự tách ra từng ô.
+                serial cùng lúc — sẽ tự tách ra từng ô, hoặc bấm <b>Quét mã</b> để quét
+                mã vạch / QR Serial bằng camera.
               </p>
 
               {submitAttempted && serialCount === 0 && (
@@ -742,6 +781,35 @@ export default function StockInForm({
                 </p>
               )}
             </div>
+
+            {scanLineKey === line.key && (
+              <SerialScannerModal
+                title={
+                  selectedModel
+                    ? `Model #${index + 1}: ${selectedModel.brand} ${selectedModel.modelName}`
+                    : `Model #${index + 1}`
+                }
+                maxLength={SERIAL_MAX_LENGTH}
+                defaultStripApplePrefix={selectedModel?.brand.trim().toLowerCase() === "apple"}
+                existingInForm={
+                  new Map(
+                    lines.flatMap((l) =>
+                      l.serials
+                        .map((s) => s.trim().toLowerCase())
+                        .filter(Boolean)
+                        .map((s) => [s, l.key === line.key ? "line" : "other"] as const)
+                    )
+                  )
+                }
+                onAdd={(serial) => addScannedSerial(line.key, serial)}
+                checkInSystem={checkSerialsInSystem}
+                onClose={() => {
+                  setScanLineKey(null);
+                  // Kiểm tra trùng toàn phiếu (cả với hệ thống) như khi gõ tay.
+                  void handleAnyBlur();
+                }}
+              />
+            )}
           </section>
         );
       })}
@@ -755,15 +823,15 @@ export default function StockInForm({
         Thêm model khác vào cùng phiếu này
       </button>
 
-      {checking && (
-        <p className="text-sm text-slate-400">Đang kiểm tra trùng...</p>
-      )}
-
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500">
           Tổng cộng <span className="font-bold text-slate-900">{totalSerials}</span>{" "}
           thiết bị trong <span className="font-bold text-slate-900">{lines.length}</span>{" "}
           model
+          {/* Hiện CÙNG dòng (không chèn 1 dòng mới phía trên nút Lưu) — trước
+              đây dòng "Đang kiểm tra trùng..." chèn thêm làm nút Lưu bị đẩy
+              xuống giữa lúc đang bấm, cú click đầu rơi ra ngoài nút. */}
+          {checking && <span className="ml-2 text-slate-400">· Đang kiểm tra trùng...</span>}
         </p>
 
         <div className="flex gap-3">
@@ -775,9 +843,18 @@ export default function StockInForm({
             Hủy
           </Link>
 
+          {/* LỖI CŨ "bấm Lưu lần 1 không phản ứng": đang ở ô Serial mà bấm
+              Lưu -> ô Serial mất focus (blur) NGAY lúc nhấn chuột -> chạy
+              kiểm tra trùng -> nút bị disable (checking) + layout xê dịch ->
+              cú click bị nuốt, phải bấm lần 2. Sửa: (1) chặn mất focus khi
+              nhấn chuột vào nút (onMouseDown preventDefault) nên không chạy
+              kiểm tra trùng chen ngang; (2) KHÔNG disable nút trong lúc đang
+              kiểm tra — server vẫn kiểm tra trùng Serial lần cuối khi lưu
+              (createStockInAction) và báo lỗi rõ ràng nếu có. */}
           <button
             type="submit"
-            disabled={hasBlockingDuplicate || checking || isPending}
+            onMouseDown={(e) => e.preventDefault()}
+            disabled={hasBlockingDuplicate || isPending}
             title={
               hasBlockingDuplicate
                 ? "Vui lòng sửa các Serial Number bị trùng trước khi lưu"
