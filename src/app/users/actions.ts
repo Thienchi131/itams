@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "@/lib/password-hash";
 import { revalidatePath } from "next/cache";
 import { generateRandomPassword } from "@/lib/password";
 import { sendUserPasswordEmail } from "@/lib/mail";
@@ -35,7 +35,7 @@ export async function resetUserPasswordAction(
   }
 
   const newPassword = generateRandomPassword(12);
-  const hashedPassword = await bcrypt.hash(newPassword, 12);
+  const hashedPassword = await hashPassword(newPassword);
 
   await prisma.user.update({
     where: { id: user.id },
@@ -78,39 +78,83 @@ export async function resetUserPasswordAction(
   return { success: `Đã đặt lại mật khẩu và gửi email cho ${user.fullName}.` };
 }
 
-// Escape hatch cho Admin khi user mất điện thoại/đổi máy nên không còn truy
-// cập được app authenticator cũ — không có gì để "khôi phục" (secret cũ chỉ
-// mình họ có), nên xử lý bằng cách tắt 2FA hẳn, buộc thiết lập lại từ đầu ở
-// lần đăng nhập kế tiếp (giống hệt cơ chế mustChangePassword).
-export async function resetUserTwoFactorAction(
+// Escape hatch cho Admin — tách 2 nút riêng (user KHÔNG tự quản lý được):
+// - Reset YubiKey: xoá key đang gắn (mất key / đổi sang key khác; mỗi tài
+//   khoản chỉ 1 key). Nếu user còn app
+//   Authenticator thì đăng nhập bằng mã app rồi bị bắt đăng ký key mới.
+// - Reset app Authenticator: tắt mã app (VD mất/đổi điện thoại). Nếu user
+//   còn key thì vẫn đăng nhập bằng key.
+// Hết cả 2 cách -> twoFactorEnabled = false, lần đăng nhập tới thiết lập lại
+// từ đầu (giống cơ chế mustChangePassword).
+export async function resetUserSecurityKeysAction(
   _prevState: UserActionState,
   formData: FormData
 ): Promise<UserActionState> {
   const currentUser = await requireRole(["Admin"]);
-
   const userId = Number(formData.get("userId"));
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return { error: "Không tìm thấy user" };
 
-  if (!user) {
-    return { error: "Không tìm thấy user" };
-  }
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: { twoFactorEnabled: false, twoFactorSecret: null },
+  const removedKeys = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.yubikeyOtpDevice.deleteMany({ where: { userId } });
+    await tx.user.update({
+      where: { id: userId },
+      data: { twoFactorEnabled: user.totpEnabled },
+    });
+    return count;
   });
 
   await createAuditLog({
     actorName: currentUser.fullName,
-    action: "Reset 2FA",
+    action: "Reset YubiKey",
+    targetType: "User",
+    targetId: user.id,
+    detail: `${user.fullName} (${user.username}) — xoá ${removedKeys} YubiKey`,
+  });
+
+  revalidatePath("/users");
+  return {
+    success: user.totpEnabled
+      ? `Đã xoá YubiKey của ${user.fullName}. Họ đăng nhập bằng mã app Authenticator rồi đăng ký key mới.`
+      : `Đã xoá YubiKey của ${user.fullName}. Lần đăng nhập tới họ sẽ đăng ký lại YubiKey từ đầu.`,
+  };
+}
+
+export async function resetUserAuthenticatorAction(
+  _prevState: UserActionState,
+  formData: FormData
+): Promise<UserActionState> {
+  const currentUser = await requireRole(["Admin"]);
+  const userId = Number(formData.get("userId"));
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { yubikey: { select: { id: true } } },
+  });
+  if (!user) return { error: "Không tìm thấy user" };
+
+  const hasKey = !!user.yubikey;
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { totpEnabled: false, twoFactorSecret: null, twoFactorEnabled: hasKey },
+  });
+
+  await createAuditLog({
+    actorName: currentUser.fullName,
+    action: "Reset app Authenticator",
     targetType: "User",
     targetId: user.id,
     detail: `${user.fullName} (${user.username})`,
   });
 
   revalidatePath("/users");
-  return { success: `Đã reset 2FA cho ${user.fullName}. Người dùng sẽ thiết lập lại ở lần đăng nhập tới.` };
+  return {
+    success: hasKey
+      ? `Đã tắt app Authenticator của ${user.fullName}. Họ vẫn đăng nhập bằng YubiKey.`
+      : `Đã tắt app Authenticator của ${user.fullName}. Lần đăng nhập tới họ sẽ thiết lập lại 2FA từ đầu.`,
+  };
 }
 
 export async function deleteUserAction(

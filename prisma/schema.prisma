@@ -29,8 +29,15 @@ model User {
   // (hẹp hơn, an toàn hơn về mặt lộ dữ liệu). Xem thêm getCurrentUser().
   warehouseId            Int?
   mustChangePassword     Boolean              @default(true)
+  // twoFactorEnabled = đã thiết lập ÍT NHẤT 1 cách 2FA (app Authenticator
+  // HOẶC YubiKey OTP). totpEnabled = riêng app Authenticator
+  // đã xác nhận xong (twoFactorSecret có thể đang là secret chờ xác nhận).
   twoFactorEnabled       Boolean              @default(false)
   twoFactorSecret        String?
+  totpEnabled            Boolean              @default(false)
+  // YubiKey (Yubico OTP, xác minh qua YubiCloud) — cách 2FA chính. Mỗi tài
+  // khoản đúng 1 key; đổi key = Admin xoá key cũ ở trang Tài khoản.
+  yubikey                YubikeyOtpDevice?
   lastNotificationReadAt DateTime?
   createdAt              DateTime             @default(now())
   role                   Role                 @relation(fields: [roleId], references: [id])
@@ -50,6 +57,21 @@ model User {
 
   @@index([regionId])
   @@index([warehouseId])
+}
+
+// YubiKey đăng ký theo chế độ Yubico OTP: chạm key -> key "gõ" ra mã 44 ký
+// tự (modhex), 12 ký tự đầu là Public ID cố định của key, phần còn lại là mã
+// dùng 1 lần, được xác minh qua YubiCloud (api.yubico.com). Dùng thay cho mã
+// app Authenticator ở bước 2FA (mật khẩu vẫn bắt buộc). 1 user đúng 1 key,
+// 1 key chỉ thuộc 1 user. User KHÔNG tự quản lý key — Admin xoá ở /users.
+model YubikeyOtpDevice {
+  id         Int       @id @default(autoincrement())
+  userId     Int       @unique
+  publicId   String    @unique
+  name       String
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model UserWarehouseAccess {
@@ -196,6 +218,10 @@ model AssetModel {
   // (đang null) sang OK cùng lúc set default này.
   tag            AssetModelTag? @default(OK)
   assets         Asset[]
+  // Mã vạch sản phẩm (UPC/EAN) in trên hộp máy mới — 1 model có thể có
+  // nhiều mã (khác màu / thị trường). Quét ở Phiếu nhập kho để tự chọn đúng
+  // model thay vì tạo model mới trùng. Chỉ Admin gắn/xoá ở Model Library.
+  barcodes       AssetModelBarcode[]
   category       AssetCategory @relation(fields: [categoryId], references: [id])
 
   @@unique([brand, modelName])
@@ -203,6 +229,20 @@ model AssetModel {
   @@index([brand])
   @@index([modelName])
   @@index([tag])
+}
+
+// Mã UPC/EAN trên hộp sản phẩm -> Model. "code" lưu dạng chuẩn hoá (chỉ số;
+// UPC-A 12 số được thêm 0 đầu thành 13 số, cùng dạng với EAN-13) — xem
+// src/modules/asset/model-barcode.ts. Mỗi mã chỉ trỏ tới đúng 1 model.
+model AssetModelBarcode {
+  id            Int        @id @default(autoincrement())
+  code          String     @unique
+  modelId       Int
+  createdByName String?
+  createdAt     DateTime   @default(now())
+  model         AssetModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@index([modelId])
 }
 
 model Asset {

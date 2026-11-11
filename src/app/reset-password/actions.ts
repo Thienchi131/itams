@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "@/lib/password-hash";
 import { redirect } from "next/navigation";
 import { hashResetToken } from "@/lib/reset-token";
 
@@ -39,7 +39,7 @@ export async function resetPasswordAction(formData: FormData) {
     redirect("/forgot-password?error=expired");
   }
 
-  const hashedPassword = await bcrypt.hash(newPassword, 12);
+  const hashedPassword = await hashPassword(newPassword);
 
   await prisma.$transaction([
     prisma.user.update({

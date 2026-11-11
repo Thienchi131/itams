@@ -101,6 +101,13 @@ export async function mergeModelsAction(formData: FormData) {
       });
     }
 
+    // Chuyển luôn mã UPC/EAN của các model bị gộp sang bản giữ lại (FK
+    // onDelete Cascade — không chuyển thì xoá model cũ sẽ mất mã).
+    await tx.assetModelBarcode.updateMany({
+      where: { modelId: { in: duplicateIds } },
+      data: { modelId: primaryId },
+    });
+
     await tx.assetModel.deleteMany({ where: { id: { in: duplicateIds } } });
   });
 

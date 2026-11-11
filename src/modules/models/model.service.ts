@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { normalizeModelBarcode } from "@/modules/asset/model-barcode";
 
 export async function getAssetModels(search?: string) {
   const q = search?.trim();
@@ -11,6 +12,8 @@ export async function getAssetModels(search?: string) {
             { brand: { contains: q, mode: "insensitive" } },
             { modelName: { contains: q, mode: "insensitive" } },
             { category: { name: { contains: q, mode: "insensitive" } } },
+            // Gõ/dán mã UPC/EAN trên hộp vào ô tìm kiếm cũng ra model.
+            ...barcodeFilter(q),
           ],
         }
       : undefined,
@@ -32,4 +35,15 @@ export async function getAssetModels(search?: string) {
       id: "desc",
     },
   });
+}
+
+function barcodeFilter(q: string) {
+  const normalized = normalizeModelBarcode(q);
+  if (normalized.ok) return [{ barcodes: { some: { code: normalized.code } } }];
+  const digits = q.replace(/\D/g, "");
+  // Gõ dở 1 phần mã (>= 6 số) thì tìm gần đúng.
+  if (digits.length >= 6 && digits.length === q.replace(/[\s-]/g, "").length) {
+    return [{ barcodes: { some: { code: { contains: digits } } } }];
+  }
+  return [];
 }

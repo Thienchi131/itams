@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/modules/auth/auth.service";
 import { redirect } from "next/navigation";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "@/lib/password-hash";
 import { withFlash } from "@/lib/flash";
 
 export type ChangePasswordState = { error: string } | null;
@@ -26,7 +26,7 @@ export async function changePasswordAction(
     return { error: "Password nhập lại không khớp" };
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+  const hashedPassword = await hashPassword(password);
 
   await prisma.user.update({
     where: { id },

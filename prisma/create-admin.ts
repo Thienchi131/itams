@@ -13,7 +13,7 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "../src/lib/password-hash";
 import crypto from "crypto";
 
 const prisma = new PrismaClient();
@@ -47,7 +47,7 @@ async function main() {
   });
 
   const newPassword = generateRandomPassword(16);
-  const hashedPassword = await bcrypt.hash(newPassword, 12);
+  const hashedPassword = await hashPassword(newPassword);
 
   const existed = await prisma.user.findUnique({
     where: { username: ADMIN_EMAIL },

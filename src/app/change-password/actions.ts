@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireLogin } from "@/modules/auth/auth.service";
 import { getDefaultRouteForRole } from "@/modules/auth/permissions";
-import bcrypt from "bcryptjs";
+import { hashPassword, verifyPassword } from "@/lib/password-hash";
 import { redirect } from "next/navigation";
 import { withFlash } from "@/lib/flash";
 
@@ -16,7 +16,14 @@ export async function changeOwnPasswordAction(formData: FormData) {
   const newPassword = String(formData.get("newPassword") || "");
   const confirmPassword = String(formData.get("confirmPassword") || "");
 
-  const isCurrentValid = await bcrypt.compare(currentPassword, user.password);
+  // Lấy hash mật khẩu riêng (getCurrentUser đã omit password để không chảy
+  // ra mọi trang) — chỉ nạp đúng lúc cần kiểm tra mật khẩu hiện tại.
+  const row = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { password: true },
+  });
+  const isCurrentValid =
+    !!row && (await verifyPassword(currentPassword, row.password)).valid;
 
   if (!isCurrentValid) {
     redirect("/change-password?error=current");
@@ -34,7 +41,7 @@ export async function changeOwnPasswordAction(formData: FormData) {
     redirect("/change-password?error=same");
   }
 
-  const hashedPassword = await bcrypt.hash(newPassword, 12);
+  const hashedPassword = await hashPassword(newPassword);
 
   await prisma.user.update({
     where: { id: user.id },

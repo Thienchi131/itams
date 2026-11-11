@@ -72,7 +72,7 @@ export default async function ModelsPage({
             <input
               name="q"
               defaultValue={q ?? ""}
-              placeholder="Tìm theo Model Code, Brand, Model hoặc Loại..."
+              placeholder="Tìm theo Model Code, Brand, Model, Loại hoặc mã UPC..."
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-11 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
             />
           </div>

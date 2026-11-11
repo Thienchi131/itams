@@ -13,11 +13,13 @@ export async function getUsers(q?: string) {
 
   return prisma.user.findMany({
     where,
+    omit: { password: true, twoFactorSecret: true },
     include: {
       role: true,
       region: true,
       warehouse: true,
       warehouseAccess: { include: { warehouse: true } },
+      yubikey: { select: { publicId: true, createdAt: true, lastUsedAt: true } },
     },
     orderBy: {
       id: "asc",
@@ -29,6 +31,7 @@ export async function getUserById(id: number) {
     where: {
       id,
     },
+    omit: { password: true, twoFactorSecret: true },
     include: {
       role: true,
       region: true,

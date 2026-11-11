@@ -5,6 +5,11 @@ import Link from "next/link";
 import { useActionState, useCallback, useMemo, useState } from "react";
 import ModelSearchSelect from "./ModelSearchSelect";
 import SerialScannerModal from "./SerialScannerModal";
+import ProductBarcodeScannerModal, {
+  type BarcodeScanFeedback,
+} from "../../components/ProductBarcodeScannerModal";
+import { findModelByBarcodeAction } from "../../models/barcode-actions";
+import { formatModelBarcode } from "@/modules/asset/model-barcode";
 import EmployeeSelect from "../../components/EmployeeSelect";
 import QuickAddEmployeeModal from "./QuickAddEmployeeModal";
 import {
@@ -25,6 +30,7 @@ import {
   UserRoundSearch,
   MessageSquareText,
   ScanLine,
+  ScanBarcode,
 } from "lucide-react";
 
 const SERIAL_MAX_LENGTH = 16;
@@ -97,10 +103,12 @@ export default function StockInForm({
   models,
   warehouses,
   employees,
+  isAdmin,
 }: {
   models: ModelItem[];
   warehouses: WarehouseItem[];
   employees: EmployeeItem[];
+  isAdmin: boolean;
 }) {
   const [lines, setLines] = useState<Line[]>([newLine()]);
   const [stockInType, setStockInType] = useState<"NEW_PURCHASE" | "RETURNED">(
@@ -128,10 +136,46 @@ export default function StockInForm({
   const [submitAttempted, setSubmitAttempted] = useState(false);
   // Dòng model đang mở camera quét Serial (null = không quét).
   const [scanLineKey, setScanLineKey] = useState<string | null>(null);
+  // Dòng model đang mở camera quét mã UPC/EAN trên hộp để tự chọn Model.
+  const [boxScanLineKey, setBoxScanLineKey] = useState<string | null>(null);
+  // Mã hộp quét được nhưng CHƯA gắn với model nào (theo dòng) — hiện nhắc
+  // dưới ô chọn Model để IT báo Admin gắn (chỉ Admin gắn mã ở Model Library).
+  const [unmatchedBoxCodes, setUnmatchedBoxCodes] = useState<Record<string, string>>({});
   const [state, formAction, isPending] = useActionState<StockInState, FormData>(
     createStockInAction,
     null
   );
+
+  async function handleBoxBarcode(lineKey: string, code: string): Promise<BarcodeScanFeedback> {
+    const shown = formatModelBarcode(code);
+    const res = await findModelByBarcodeAction(code);
+    if (!res.found && res.error) return { tone: "error", text: res.error };
+
+    if (!res.found) {
+      setUnmatchedBoxCodes((prev) => ({ ...prev, [lineKey]: shown }));
+      return {
+        tone: "warn",
+        text: isAdmin
+          ? `Mã ${shown} chưa gắn với model nào. Chọn model bằng tay, rồi vào Model Library > Sửa model > "Mã UPC/EAN trên hộp" để gắn mã này.`
+          : `Mã ${shown} chưa gắn với model nào. Chọn model bằng tay và báo Admin gắn mã này vào đúng model (không tạo model mới).`,
+      };
+    }
+
+    if (!models.some((m) => String(m.id) === String(res.modelId))) {
+      return {
+        tone: "warn",
+        text: `Mã ${shown} thuộc ${res.label} — model này vừa được thêm/gộp, tải lại trang để chọn được.`,
+      };
+    }
+
+    updateLine(lineKey, { modelId: String(res.modelId) });
+    setUnmatchedBoxCodes((prev) => {
+      const next = { ...prev };
+      delete next[lineKey];
+      return next;
+    });
+    return { tone: "ok", text: `Đã chọn model: ${res.label}`, close: true };
+  }
 
   function updateLine(key: string, patch: Partial<Line>) {
     setLines((prev) =>
@@ -592,11 +636,30 @@ export default function StockInForm({
 
             <div className="grid grid-cols-2 gap-5">
               <Field icon={<Laptop size={18} />} label="Model thiết bị" required>
-                <ModelSearchSelect
-                  models={models}
-                  value={line.modelId}
-                  onChange={(modelId) => updateLine(line.key, { modelId })}
-                />
+                <div className="flex gap-2">
+                  <div className="min-w-0 flex-1">
+                    <ModelSearchSelect
+                      models={models}
+                      value={line.modelId}
+                      onChange={(modelId) => updateLine(line.key, { modelId })}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setBoxScanLineKey(line.key)}
+                    className="flex shrink-0 items-center gap-1.5 rounded-xl border border-blue-200 px-3 text-sm font-semibold text-blue-600 hover:bg-blue-50"
+                    title="Quét mã UPC/EAN trên hộp máy mới để tự chọn Model"
+                  >
+                    <ScanBarcode size={16} />
+                    <span className="hidden sm:inline">Quét hộp</span>
+                  </button>
+                </div>
+                {unmatchedBoxCodes[line.key] && (
+                  <p className="mt-1.5 text-xs font-semibold text-amber-700">
+                    Mã hộp {unmatchedBoxCodes[line.key]} chưa gắn model —{" "}
+                    {isAdmin ? "gắn ở Model Library sau khi chọn đúng model." : "báo Admin gắn vào đúng model."}
+                  </p>
+                )}
                 {submitAttempted && !line.modelId && (
                   <p className="mt-1.5 text-xs font-semibold text-rose-600">
                     Vui lòng chọn Model cho dòng này.
@@ -781,6 +844,14 @@ export default function StockInForm({
                 </p>
               )}
             </div>
+
+            {boxScanLineKey === line.key && (
+              <ProductBarcodeScannerModal
+                title={`Model #${index + 1}: tự chọn Model theo mã trên hộp`}
+                onDetected={(code) => handleBoxBarcode(line.key, code)}
+                onClose={() => setBoxScanLineKey(null)}
+              />
+            )}
 
             {scanLineKey === line.key && (
               <SerialScannerModal

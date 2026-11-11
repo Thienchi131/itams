@@ -1,14 +1,16 @@
 import { prisma } from "@/lib/prisma";
+import { isSecurityKeyRequired } from "./security-key-policy";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import bcrypt from "bcryptjs";
+import { hashPassword, verifyPassword } from "@/lib/password-hash";
 import { signSession, verifySession, SESSION_MAX_AGE_MS } from "@/lib/session";
 
 // Fixed-cost bcrypt hash with no matching plaintext, used so that login()
 // takes the same time whether or not the account exists (prevents timing
-// based user/email enumeration).
+// based user/email enumeration). Cost phải BẰNG cost của mật khẩu thật (12),
+// nếu không email không tồn tại sẽ trả lời nhanh hơn -> lộ email nào có thật.
 const DUMMY_HASH =
-  "$2b$10$LU9oQToK/3QxBpU1jRLXO.H.XM6BmhhBzMey9vCB6tE64jYit6rhy";
+  "$2b$12$ykWaYztfjwzFRWx4N8S5pOh2hoRbegl8TTU0FR.HNtYRNt9Q0ndq2";
 
 export async function login(
   email: string,
@@ -26,13 +28,23 @@ export async function login(
     },
   });
 
-  const isPasswordValid = await bcrypt.compare(
+  const { valid: isPasswordValid, needsUpgrade } = await verifyPassword(
     password,
     user?.password ?? DUMMY_HASH
   );
 
   if (!user || !isPasswordValid) {
     return null;
+  }
+
+  // Mật khẩu lưu dạng cũ (bcrypt cost < 12, hoặc chưa mã hoá AES) -> lưu lại
+  // dạng mới ngay lúc đăng nhập đúng (đang có mật khẩu gốc), user không phải
+  // làm gì. Xem src/lib/password-hash.ts.
+  if (needsUpgrade) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: await hashPassword(password) },
+    });
   }
 
   const cookieStore = await cookies();
@@ -109,6 +121,12 @@ export async function getCurrentUser() {
     where: {
       id: session.userId,
     },
+    // Không kéo hash mật khẩu + secret TOTP vào object currentUser (chảy ra
+    // mọi trang) — tránh nguy cơ lộ ra client nếu lỡ truyền cả object cho 1
+    // Client Component. Chỗ nào thật sự cần secret TOTP (setup/verify 2FA)
+    // lấy riêng qua getOwnTwoFactorSecret(). Login dùng query riêng nên
+    // không ảnh hưởng.
+    omit: { password: true, twoFactorSecret: true },
     include: {
       role: true,
       region: { include: { warehouses: true } },
@@ -117,6 +135,8 @@ export async function getCurrentUser() {
       // ở UserWarehouseAccess trong schema.prisma. Dùng cho case cần xem
       // nhiều kho cắt ngang nhiều Region (VD kế toán).
       warehouseAccess: { select: { warehouseId: true } },
+      // YubiKey đã đăng ký (tối đa 1) — requireLogin() bắt đăng ký nếu chưa có.
+      yubikey: { select: { id: true } },
     },
   });
 
@@ -179,9 +199,21 @@ export async function getCurrentUser() {
   return { ...user, twoFactorVerified: session.twoFactorVerified, regionWarehouseIds };
 }
 
+// Lấy RIÊNG secret TOTP của 1 user (getCurrentUser đã omit) — chỉ dùng ở
+// luồng thiết lập / xác thực 2FA bằng app Authenticator.
+export async function getOwnTwoFactorSecret(userId: number): Promise<string | null> {
+  const row = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { twoFactorSecret: true },
+  });
+  return row?.twoFactorSecret ?? null;
+}
+
 export async function requireLogin(options?: {
   skipPasswordCheck?: boolean;
   skip2FACheck?: boolean;
+  // Chỉ dùng bởi chính trang /register-key (bắt buộc đăng ký YubiKey).
+  skipSecurityKeyCheck?: boolean;
 }) {
   const user = await getCurrentUser();
 
@@ -207,6 +239,16 @@ export async function requireLogin(options?: {
 
     if (!user.twoFactorVerified) {
       redirect("/verify-2fa");
+    }
+
+    // YubiKey bắt buộc: đã qua 2FA (VD bằng mã app dự phòng) mà chưa có key
+    // nào thì phải đăng ký key trước khi dùng bất kỳ trang nào.
+    if (
+      isSecurityKeyRequired() &&
+      !user.yubikey &&
+      !options?.skipSecurityKeyCheck
+    ) {
+      redirect("/register-key");
     }
   }
 

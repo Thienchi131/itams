@@ -4,7 +4,8 @@ import { requireRole } from "@/modules/auth/auth.service";
 import Link from "next/link";
 import {
   resetUserPasswordAction,
-  resetUserTwoFactorAction,
+  resetUserSecurityKeysAction,
+  resetUserAuthenticatorAction,
   deleteUserAction,
 } from "./actions";
 import ConfirmActionForm from "@/app/components/ConfirmActionForm";
@@ -16,6 +17,8 @@ import {
   Shield,
   ShieldCheck,
   ShieldOff,
+  Usb,
+  Smartphone,
   CalendarDays,
   Eye,
   KeyRound,
@@ -191,12 +194,22 @@ export default async function UsersPage({
                     <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-emerald-100 px-3 py-1 font-semibold text-emerald-700">
                       <ShieldCheck size={14} />
                       Đã bật
+                      <span className="font-normal">
+                        · {[user.yubikey && "YubiKey", user.totpEnabled && "App"].filter(Boolean).join(" + ")}
+                      </span>
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-500">
                       <ShieldOff size={14} />
                       Chưa bật
                     </span>
+                  )}
+                  {/* Public ID = 12 ký tự đầu mã OTP, cố định theo từng key —
+                      để Admin biết key nào đang gắn với tài khoản. */}
+                  {user.yubikey && (
+                    <p className="mt-1 font-mono text-xs text-slate-400" title="Public ID của YubiKey">
+                      {user.yubikey.publicId}
+                    </p>
                   )}
                 </td>
 
@@ -233,16 +246,30 @@ export default async function UsersPage({
                       iconOnly
                     />
 
-                    {user.twoFactorEnabled && (
+                    {user.yubikey && (
                       <ConfirmActionForm
-                        action={resetUserTwoFactorAction}
+                        action={resetUserSecurityKeysAction}
                         userId={user.id}
-                        label="Reset 2FA"
-                        title="Xác nhận reset 2FA"
-                        message={`Bạn có chắc muốn tắt xác thực 2 lớp của tài khoản ${user.fullName}? Dùng khi họ mất điện thoại/đổi máy — lần đăng nhập kế tiếp họ sẽ phải thiết lập lại 2FA từ đầu.`}
-                        confirmLabel="Reset 2FA"
+                        label="Reset YubiKey"
+                        title="Xác nhận reset YubiKey"
+                        message={`Xoá YubiKey (ID ${user.yubikey.publicId}) của ${user.fullName}? Dùng khi họ mất key hoặc đổi sang key khác. ${user.totpEnabled ? "Họ đăng nhập bằng mã app Authenticator rồi sẽ bị yêu cầu đăng ký key mới." : "Họ không có app Authenticator dự phòng nên lần đăng nhập tới sẽ đăng ký lại YubiKey từ đầu."}`}
+                        confirmLabel="Reset YubiKey"
                         color="amber"
-                        icon={<ShieldOff size={16} />}
+                        icon={<Usb size={16} />}
+                        iconOnly
+                      />
+                    )}
+
+                    {user.totpEnabled && (
+                      <ConfirmActionForm
+                        action={resetUserAuthenticatorAction}
+                        userId={user.id}
+                        label="Reset app Authenticator"
+                        title="Xác nhận reset app Authenticator"
+                        message={`Tắt mã app Authenticator của ${user.fullName}? Dùng khi họ mất/đổi điện thoại. ${user.yubikey ? "Họ vẫn đăng nhập bằng YubiKey." : "Họ chưa có YubiKey nên lần đăng nhập tới sẽ thiết lập lại 2FA từ đầu."}`}
+                        confirmLabel="Reset app"
+                        color="amber"
+                        icon={<Smartphone size={16} />}
                         iconOnly
                       />
                     )}

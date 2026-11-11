@@ -7,6 +7,7 @@ import { updateModelAction } from "./actions";
 import SmartSelect from "./SmartSelect";
 import SubmitButton from "../../components/SubmitButton";
 import { TriangleAlert } from "lucide-react";
+import ModelBarcodesSection from "./ModelBarcodesSection";
 
 const ERROR_MESSAGES: Record<string, string> = {
   duplicate_model: "Model này (cùng Brand + Model Name) đã tồn tại trong danh mục.",
@@ -41,7 +42,10 @@ export default async function EditModelPage({
 
   const model = await prisma.assetModel.findUnique({
     where: { id: Number(id) },
-    include: { category: true },
+    include: {
+      category: true,
+      barcodes: { select: { id: true, code: true }, orderBy: { id: "asc" } },
+    },
   });
 
   if (!model) notFound();
@@ -168,6 +172,10 @@ export default async function EditModelPage({
           </SubmitButton>
         </div>
       </form>
+
+      {/* Ngoài <form> sửa model (không lồng form) — gắn/xoá mã lưu ngay,
+          không cần bấm "Lưu thay đổi". */}
+      <ModelBarcodesSection modelId={model.id} initialBarcodes={model.barcodes} />
     </AppLayout>
   );
 }

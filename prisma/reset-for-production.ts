@@ -20,7 +20,7 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "../src/lib/password-hash";
 import crypto from "crypto";
 
 const prisma = new PrismaClient();
@@ -110,7 +110,7 @@ async function main() {
   console.log(`- Đã xoá mọi User khác, chỉ giữ ${ADMIN_EMAIL}`);
 
   const newPassword = generateRandomPassword(16);
-  const hashedPassword = await bcrypt.hash(newPassword, 12);
+  const hashedPassword = await hashPassword(newPassword);
 
   await prisma.user.upsert({
     where: { username: ADMIN_EMAIL },

@@ -1,6 +1,6 @@
 "use server";
 
-import { requireLogin, upgradeSessionTo2FAVerified } from "@/modules/auth/auth.service";
+import { requireLogin, upgradeSessionTo2FAVerified, getOwnTwoFactorSecret } from "@/modules/auth/auth.service";
 import { getDefaultRouteForRole } from "@/modules/auth/permissions";
 import { verifyTwoFactorCode } from "@/lib/totp";
 import { isRateLimited } from "@/lib/rate-limit";
@@ -33,11 +33,13 @@ export async function verifyTwoFactorAction(formData: FormData) {
     redirect("/verify-2fa?error=rate_limited");
   }
 
-  if (!user.twoFactorSecret) {
-    redirect("/setup-2fa");
+  // Tài khoản chỉ dùng YubiKey (đã tắt app Authenticator) thì không nhận mã.
+  const secret = user.totpEnabled ? await getOwnTwoFactorSecret(user.id) : null;
+  if (!secret) {
+    redirect("/verify-2fa?error=no_totp");
   }
 
-  const isValid = verifyTwoFactorCode(user.twoFactorSecret, code);
+  const isValid = verifyTwoFactorCode(secret, code);
 
   if (!isValid) {
     redirect("/verify-2fa?error=invalid_code");

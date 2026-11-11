@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "@/lib/password-hash";
 import { redirect } from "next/navigation";
 import { generateRandomPassword } from "@/lib/password";
 import { sendUserPasswordEmail } from "@/lib/mail";
@@ -76,7 +76,7 @@ export async function createUserAction(
   }
 
   const plainPassword = generateRandomPassword(12);
-  const hashedPassword = await bcrypt.hash(plainPassword, 12);
+  const hashedPassword = await hashPassword(plainPassword);
 
   const newUser = await prisma.user.create({
     data: {

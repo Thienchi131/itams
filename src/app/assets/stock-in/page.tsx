@@ -33,7 +33,12 @@ export default async function StockInPage() {
         </p>
       </div>
 
-      <StockInForm models={models} warehouses={warehouses} employees={employees} />
+      <StockInForm
+        models={models}
+        warehouses={warehouses}
+        employees={employees}
+        isAdmin={currentUser.role.name === ROLE_ADMIN}
+      />
     </AppLayout>
   );
 }

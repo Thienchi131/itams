@@ -19,7 +19,7 @@ import { verifyTwoFactorAction } from "./actions";
 // tức thời tuyệt đối). Nếu mã sai, action redirect về chính trang này kèm
 // ?error=... — Server Component re-render, component này mount lại mới hoàn
 // toàn, isPending tự về false, không cần tự dọn state thủ công.
-export default function VerifyTwoFactorForm() {
+export default function VerifyTwoFactorForm({ autoFocus = true }: { autoFocus?: boolean }) {
   const [code, setCode] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -45,7 +45,7 @@ export default function VerifyTwoFactorForm() {
         autoComplete="one-time-code"
         maxLength={6}
         required
-        autoFocus
+        autoFocus={autoFocus}
         disabled={isPending}
         value={code}
         onChange={(e) => {
