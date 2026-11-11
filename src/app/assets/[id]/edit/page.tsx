@@ -17,7 +17,12 @@ export default async function EditAssetPage({
 
   const asset = await prisma.asset.findUnique({
     where: { id: Number(id) },
-    include: { model: true },
+    include: {
+      model: true,
+      // Lấy bản ghi bảo hành (nếu có) để Admin sửa/xoá — dùng khi IT nhập
+      // nhầm máy thu hồi cũ thành "mua mới" kèm hạn bảo hành.
+      warranties: { orderBy: { id: "asc" }, take: 1 },
+    },
   });
 
   if (!asset) notFound();
@@ -49,6 +54,16 @@ export default async function EditAssetPage({
     notFound();
   }
 
+  const w = asset.warranties[0] ?? null;
+  const toDateInput = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
+  const warranty = w
+    ? {
+        provider: w.provider ?? "",
+        startDate: toDateInput(w.startDate),
+        endDate: toDateInput(w.endDate),
+      }
+    : null;
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -69,7 +84,7 @@ export default async function EditAssetPage({
           </p>
         </div>
 
-        <EditAssetForm asset={asset} models={models} />
+        <EditAssetForm asset={asset} models={models} warranty={warranty} />
       </div>
     </AppLayout>
   );

@@ -7,6 +7,7 @@ import {
   getIssuedReport,
 } from "@/modules/report/report.service";
 import WarehouseFilterSelect from "../components/WarehouseFilterSelect";
+import { scopedWarehouseCount } from "@/lib/warehouse-filter";
 import ReportPeriodSelect from "./ReportPeriodSelect";
 import LocalDateTime from "../components/LocalDateTime";
 import { PackagePlus, UserCheck, Boxes, Users } from "lucide-react";
@@ -77,7 +78,7 @@ export default async function ReportsPage({
           <ReportPeriodSelect mode={mode} year={year} month={month} />
 
           {(!regionWarehouseIds ||
-            allRegions.some((r) => r.warehouses.length > 1)) && (
+            scopedWarehouseCount(allRegions, unassignedWarehouses) > 1) && (
             <WarehouseFilterSelect
               regions={allRegions}
               unassignedWarehouses={unassignedWarehouses}

@@ -5,6 +5,7 @@ import { getAssetsWithAssignmentDue } from "@/modules/asset/asset.service";
 import { resolveWarehouseFilter } from "@/modules/warehouse/warehouse.service";
 import { ASSIGNMENT_TYPE_LABEL } from "@/modules/asset/asset.helpers";
 import WarehouseFilterSelect from "../../components/WarehouseFilterSelect";
+import { scopedWarehouseCount } from "@/lib/warehouse-filter";
 import LocalDateTime from "../../components/LocalDateTime";
 import { ArrowLeft, CalendarClock, Eye, TriangleAlert } from "lucide-react";
 
@@ -64,7 +65,7 @@ export default async function AssignmentLoansPage({
         </div>
 
         {(!regionWarehouseIds ||
-          allRegions.some((r) => r.warehouses.length > 1)) && (
+          scopedWarehouseCount(allRegions, unassignedWarehouses) > 1) && (
           <WarehouseFilterSelect
             regions={allRegions}
             unassignedWarehouses={unassignedWarehouses}

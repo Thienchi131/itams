@@ -41,12 +41,16 @@ type Asset = {
   };
 };
 
+type WarrantyInfo = { provider: string; startDate: string; endDate: string };
+
 export default function EditAssetForm({
   asset,
   models,
+  warranty,
 }: {
   asset: Asset;
   models: ModelItem[];
+  warranty: WarrantyInfo | null;
 }) {
   const [state, formAction, isPending] = useActionState<UpdateAssetState, FormData>(
     updateAssetAction,
@@ -72,6 +76,9 @@ export default function EditAssetForm({
   const [storage, setStorage] = useState(asset.actualStorage ?? "");
   const [screen, setScreen] = useState(asset.actualScreen ?? "");
   const [gpu, setGpu] = useState(asset.actualGpu ?? "");
+
+  // Bảo hành: tick "xoá" khi máy thực ra là thu hồi cũ, không có bảo hành.
+  const [removeWarranty, setRemoveWarranty] = useState(false);
 
   const selectedModel = models.find((m) => String(m.id) === modelId);
 
@@ -185,6 +192,58 @@ export default function EditAssetForm({
               placeholder={selectedModel?.defaultGpu ?? ""}
             />
           </div>
+        </section>
+
+        <section className="rounded-xl border bg-white p-6">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-lg font-semibold">Bảo hành</h3>
+            <label className="flex items-center gap-2 text-sm font-medium text-rose-600">
+              <input
+                type="checkbox"
+                name="removeWarranty"
+                checked={removeWarranty}
+                onChange={(e) => setRemoveWarranty(e.target.checked)}
+                className="h-4 w-4 accent-rose-600"
+              />
+              Xoá bảo hành (máy thu hồi cũ, không có bảo hành)
+            </label>
+          </div>
+
+          {removeWarranty ? (
+            <p className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              Khi lưu, toàn bộ thông tin bảo hành của thiết bị này sẽ bị xoá.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">Nhà bảo hành</label>
+                <input
+                  name="warrantyProvider"
+                  defaultValue={warranty?.provider ?? ""}
+                  placeholder="VD: Apple, FPT..."
+                  className="w-full rounded-lg border px-4 py-3"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">Ngày bắt đầu</label>
+                <input
+                  type="date"
+                  name="warrantyStart"
+                  defaultValue={warranty?.startDate ?? ""}
+                  className="w-full rounded-lg border px-4 py-3"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">Ngày kết thúc</label>
+                <input
+                  type="date"
+                  name="warrantyEnd"
+                  defaultValue={warranty?.endDate ?? ""}
+                  className="w-full rounded-lg border px-4 py-3"
+                />
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="rounded-xl border bg-white p-6">

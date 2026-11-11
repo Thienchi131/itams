@@ -5,6 +5,7 @@ import { getAssetsInRepair } from "@/modules/asset/asset.service";
 import { OVERDUE_DAYS_THRESHOLD } from "@/modules/asset/asset.helpers";
 import { resolveWarehouseFilter } from "@/modules/warehouse/warehouse.service";
 import WarehouseFilterSelect from "../../components/WarehouseFilterSelect";
+import { scopedWarehouseCount } from "@/lib/warehouse-filter";
 import LocalDateTime from "../../components/LocalDateTime";
 import RepairFollowUpModal from "./RepairFollowUpModal";
 import { ArrowLeft, Wrench, Eye, TriangleAlert, ClipboardCheck } from "lucide-react";
@@ -68,7 +69,7 @@ export default async function RepairTrackingPage({
         </div>
 
         {(!regionWarehouseIds ||
-          allRegions.some((r) => r.warehouses.length > 1)) && (
+          scopedWarehouseCount(allRegions, unassignedWarehouses) > 1) && (
           <WarehouseFilterSelect
             regions={allRegions}
             unassignedWarehouses={unassignedWarehouses}

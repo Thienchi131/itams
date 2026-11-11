@@ -5,6 +5,7 @@ import { canEditData, ROLE_ADMIN } from "@/modules/auth/permissions";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import WarehouseFilterSelect from "../components/WarehouseFilterSelect";
+import { scopedWarehouseCount } from "@/lib/warehouse-filter";
 import DeleteSupplyModal from "./DeleteSupplyModal";
 import { Package, Plus, Search, TriangleAlert, CheckCircle2 } from "lucide-react";
 
@@ -110,7 +111,7 @@ export default async function SuppliesPage({
         </div>
 
         <div className="flex items-center gap-3">
-          {(!regionWarehouseIds || allRegions.some((r) => r.warehouses.length > 1)) && (
+          {(!regionWarehouseIds || scopedWarehouseCount(allRegions, unassignedWarehouses) > 1) && (
             <WarehouseFilterSelect
               regions={allRegions}
               unassignedWarehouses={unassignedWarehouses}

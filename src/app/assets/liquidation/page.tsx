@@ -5,6 +5,7 @@ import { canEditData } from "@/modules/auth/permissions";
 import { getAssetsRetired } from "@/modules/asset/asset.service";
 import { resolveWarehouseFilter } from "@/modules/warehouse/warehouse.service";
 import WarehouseFilterSelect from "../../components/WarehouseFilterSelect";
+import { scopedWarehouseCount } from "@/lib/warehouse-filter";
 import LocalDateTime from "../../components/LocalDateTime";
 import ConfirmLiquidationForm from "./ConfirmLiquidationForm";
 import BulkRetireModal from "./BulkRetireModal";
@@ -76,7 +77,7 @@ export default async function LiquidationPage({
           {canManage && <BulkRetireModal />}
 
           {(!regionWarehouseIds ||
-            allRegions.some((r) => r.warehouses.length > 1)) && (
+            scopedWarehouseCount(allRegions, unassignedWarehouses) > 1) && (
             <WarehouseFilterSelect
               regions={allRegions}
               unassignedWarehouses={unassignedWarehouses}

@@ -8,6 +8,7 @@ import {
   type HandoverPhotoStatus,
 } from "@/modules/asset/handover-photo.helpers";
 import WarehouseFilterSelect from "../../components/WarehouseFilterSelect";
+import { scopedWarehouseCount } from "@/lib/warehouse-filter";
 import LocalDateTime from "../../components/LocalDateTime";
 import EmployeePhotoUpload from "./EmployeePhotoUpload";
 import { ArrowLeft, ChevronDown, Eye, ImageIcon, TriangleAlert, UserRound } from "lucide-react";
@@ -66,7 +67,7 @@ export default async function HandoverPhotosPendingPage({
           </p>
         </div>
 
-        {(!regionWarehouseIds || allRegions.some((r) => r.warehouses.length > 1)) && (
+        {(!regionWarehouseIds || scopedWarehouseCount(allRegions, unassignedWarehouses) > 1) && (
           <WarehouseFilterSelect
             regions={allRegions}
             unassignedWarehouses={unassignedWarehouses}

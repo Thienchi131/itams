@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/modules/auth/auth.service";
 import { ROLE_ADMIN, ROLE_IT, ROLE_USER } from "@/modules/auth/permissions";
 import WarehouseFilterSelect from "./components/WarehouseFilterSelect";
+import { scopedWarehouseCount } from "@/lib/warehouse-filter";
 import { truncateSerial } from "@/lib/format";
 import LocalDateTime from "./components/LocalDateTime";
 import {
@@ -385,7 +386,7 @@ export default async function Home({
         </div>
 
         <div className="flex w-full items-center gap-3 sm:w-auto sm:shrink-0">
-          {(!isScoped || allRegions.some((r) => r.warehouses.length > 1)) && (
+          {(!isScoped || scopedWarehouseCount(allRegions, unassignedWarehouses) > 1) && (
             <WarehouseFilterSelect
               regions={allRegions}
               unassignedWarehouses={unassignedWarehouses}

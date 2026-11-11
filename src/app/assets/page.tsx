@@ -5,6 +5,7 @@ import Link from "next/link";
 import AssetSearchBox from "@/modules/asset/components/AssetSearchBox";
 import ExportAssetsModal from "./ExportAssetsModal";
 import WarehouseFilterSelect from "../components/WarehouseFilterSelect";
+import { scopedWarehouseCount } from "@/lib/warehouse-filter";
 import StatusFilterSelect from "./StatusFilterSelect";
 import TeamFilterSelect from "./TeamFilterSelect";
 import CategoryFilterSelect from "./CategoryFilterSelect";
@@ -425,7 +426,7 @@ export default async function AssetsPage({
         <div className="space-y-4 border-b border-slate-100 p-5">
           <div className="flex flex-wrap items-center gap-2.5">
             {(!regionWarehouseIds ||
-              allRegions.some((r) => r.warehouses.length > 1)) && (
+              scopedWarehouseCount(allRegions, unassignedWarehouses) > 1) && (
               <WarehouseFilterSelect
                 regions={allRegions}
                 unassignedWarehouses={unassignedWarehouses}
