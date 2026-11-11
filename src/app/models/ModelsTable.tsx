@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { BookOpen, Edit, Trash2, GitMerge, X } from "lucide-react";
+import { BookOpen, Edit, Trash2, GitMerge, X, ScanBarcode } from "lucide-react";
+import AddUpcModal from "./AddUpcModal";
 import ConfirmActionButton from "@/app/components/ConfirmActionButton";
 import { deleteModelAction } from "./actions";
 import MergeModelsModal from "./MergeModelsModal";
@@ -34,6 +35,8 @@ export default function ModelsTable({
 }) {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [mergeOpen, setMergeOpen] = useState(false);
+  // Model đang mở modal thêm nhanh mã UPC (null = không mở).
+  const [upcTarget, setUpcTarget] = useState<ModelItem | null>(null);
 
   function toggle(id: number) {
     setSelectedIds((prev) =>
@@ -42,7 +45,7 @@ export default function ModelsTable({
   }
 
   const selectedModels = models.filter((m) => selectedIds.includes(m.id));
-  const columnCount = isAdmin ? 10 : 8;
+  const columnCount = isAdmin ? 7 : 5;
 
   return (
     <>
@@ -54,9 +57,6 @@ export default function ModelsTable({
             <th className="p-4 text-left">Loại</th>
             <th className="p-4 text-left">Brand</th>
             <th className="p-4 text-left">Model</th>
-            <th className="p-4 text-left">CPU</th>
-            <th className="p-4 text-left">RAM</th>
-            <th className="p-4 text-left">SSD</th>
             <th className="p-4 text-center">Số thiết bị</th>
             {isAdmin && <th className="p-4 text-right">Thao tác</th>}
           </tr>
@@ -98,10 +98,6 @@ export default function ModelsTable({
 
               <td className="p-4 font-medium">{model.modelName}</td>
 
-              <td className="p-4 text-slate-600">{model.defaultCpu ?? "-"}</td>
-              <td className="p-4 text-slate-600">{model.defaultRam ?? "-"}</td>
-              <td className="p-4 text-slate-600">{model.defaultStorage ?? "-"}</td>
-
               <td className="p-4 text-center">
                 <span className="inline-flex min-w-10 justify-center rounded-full bg-emerald-100 px-3 py-1 font-bold text-emerald-700">
                   {model._count.assets}
@@ -111,6 +107,16 @@ export default function ModelsTable({
               {isAdmin && (
                 <td className="p-4 text-right">
                   <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setUpcTarget(model)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 font-semibold text-slate-600 hover:bg-slate-50"
+                      title="Thêm nhanh mã UPC cho model này"
+                    >
+                      <ScanBarcode size={16} />
+                      UPC
+                    </button>
+
                     <Link
                       href={`/models/${model.id}${q ? `?q=${encodeURIComponent(q)}` : ""}`}
                       className="inline-flex items-center gap-2 rounded-xl border border-blue-200 px-3 py-2 font-semibold text-blue-600 hover:bg-blue-50"
@@ -197,6 +203,14 @@ export default function ModelsTable({
             </button>
           </div>
         </div>
+      )}
+
+      {upcTarget && (
+        <AddUpcModal
+          modelId={upcTarget.id}
+          modelLabel={`${upcTarget.modelCode ? `${upcTarget.modelCode} — ` : ""}${upcTarget.brand} ${upcTarget.modelName}`}
+          onClose={() => setUpcTarget(null)}
+        />
       )}
 
       {mergeOpen && selectedModels.length >= 2 && (
