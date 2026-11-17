@@ -117,6 +117,8 @@ export default async function IpWhitelistSettingsPage({
                 confirmLabel="Tắt"
                 color="rose"
                 icon={<ShieldOff size={15} />}
+                requirePassword
+                passwordLabel="Nhập mật khẩu Admin của bạn để xác nhận tắt"
               />
             </form>
           ) : (

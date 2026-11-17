@@ -6,6 +6,7 @@ import { ROLE_ADMIN } from "@/modules/auth/permissions";
 import { redirect } from "next/navigation";
 import { withFlash } from "@/lib/flash";
 import { createAuditLog } from "@/modules/audit/audit-log.service";
+import { addMonths, WARRANTY_TERMS } from "@/lib/warranty";
 
 function textOrNull(value: FormDataEntryValue | null) {
   const text = String(value || "").trim();
@@ -101,7 +102,11 @@ export async function updateAssetAction(
   });
   const wProvider = textOrNull(formData.get("warrantyProvider"));
   const wStart = dateOrNull(formData.get("warrantyStart"));
-  const wEnd = dateOrNull(formData.get("warrantyEnd"));
+  // Ngày kết thúc TÍNH từ ngày bắt đầu + thời hạn chọn (6/12/.../60 tháng).
+  // Không chọn thời hạn -> giữ nguyên ngày kết thúc cũ (nếu có).
+  const termRaw = Number(formData.get("warrantyMonths"));
+  const term = (WARRANTY_TERMS as readonly number[]).includes(termRaw) ? termRaw : null;
+  const wEnd = term && wStart ? addMonths(wStart, term) : existingWarranty?.endDate ?? null;
 
   if (removeWarranty) {
     if (existingWarranty) {

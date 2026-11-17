@@ -4,7 +4,7 @@ import { changeOwnPasswordAction } from "./actions";
 
 const ERROR_MESSAGES: Record<string, string> = {
   current: "Mật khẩu hiện tại không đúng",
-  length: "Mật khẩu mới phải có ít nhất 8 ký tự",
+  weak: "Mật khẩu mới phải có tối thiểu 12 ký tự, gồm chữ in hoa, chữ thường và số",
   mismatch: "Nhập lại mật khẩu mới không khớp",
   same: "Mật khẩu mới phải khác mật khẩu hiện tại",
 };

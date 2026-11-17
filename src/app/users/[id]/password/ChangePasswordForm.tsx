@@ -29,7 +29,7 @@ export default function ChangePasswordForm({ userId }: { userId: number }) {
               name="password"
               type="password"
               required
-              minLength={6}
+              minLength={12}
               className="input-style"
               placeholder="Nhập password mới"
             />
@@ -40,10 +40,24 @@ export default function ChangePasswordForm({ userId }: { userId: number }) {
               name="confirmPassword"
               type="password"
               required
-              minLength={6}
+              minLength={12}
               className="input-style"
               placeholder="Nhập lại password mới"
             />
+          </Field>
+
+          <Field label="Mật khẩu của BẠN (xác nhận)">
+            <input
+              name="adminPassword"
+              type="password"
+              required
+              className="input-style"
+              placeholder="Nhập mật khẩu Admin của chính bạn"
+              autoComplete="current-password"
+            />
+            <p className="mt-1.5 text-xs text-slate-400">
+              Thao tác nhạy cảm — nhập lại mật khẩu của chính bạn để xác nhận.
+            </p>
           </Field>
         </div>
       </section>

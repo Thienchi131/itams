@@ -13,6 +13,8 @@ export default function ConfirmActionButton({
   confirmLabel,
   color = "blue",
   icon,
+  requirePassword = false,
+  passwordLabel,
 }: {
   label: string;
   confirmTitle: string;
@@ -20,8 +22,13 @@ export default function ConfirmActionButton({
   confirmLabel?: string;
   color?: Color;
   icon?: React.ReactNode;
+  // Bật step-up: hiện ô nhập mật khẩu trong modal + gửi kèm field
+  // "adminPassword" để action xác minh lại chính Admin trước khi thực hiện.
+  requirePassword?: boolean;
+  passwordLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState("");
   const formRef = useRef<HTMLFormElement | null>(null);
   // Nút kích hoạt là type="button" (không phải submit) nên không tự có trạng
   // thái pending — đọc qua useFormStatus() của <form> cha (component này
@@ -71,6 +78,10 @@ export default function ConfirmActionButton({
         )}
       </button>
 
+      {requirePassword && (
+        <input type="hidden" name="adminPassword" value={password} readOnly />
+      )}
+
       {open && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl">
@@ -82,10 +93,30 @@ export default function ConfirmActionButton({
               {confirmMessage}
             </p>
 
+            {requirePassword && (
+              <div className="mt-6">
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  {passwordLabel || "Nhập mật khẩu của bạn để xác nhận"}
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoFocus
+                  placeholder="Mật khẩu của bạn"
+                  autoComplete="current-password"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base outline-none focus:border-blue-500"
+                />
+              </div>
+            )}
+
             <div className="mt-8 grid grid-cols-2 gap-4">
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  setOpen(false);
+                  setPassword("");
+                }}
                 className="rounded-2xl border border-slate-300 bg-white px-5 py-3 text-lg font-bold text-slate-900 transition hover:bg-slate-100"
               >
                 Huỷ
@@ -93,12 +124,14 @@ export default function ConfirmActionButton({
 
               <button
                 type="button"
+                disabled={requirePassword && !password}
                 onClick={() => {
+                  if (requirePassword && !password) return;
                   setOpen(false);
                   formRef.current?.requestSubmit();
                 }}
                 style={{ backgroundColor: CONFIRM_COLOR[color] }}
-                className="rounded-2xl px-5 py-3 text-lg font-bold text-white shadow-sm transition hover:opacity-90"
+                className="rounded-2xl px-5 py-3 text-lg font-bold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {finalConfirmLabel}
               </button>

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireLogin } from "@/modules/auth/auth.service";
 import { ROLE_ADMIN } from "@/modules/auth/permissions";
 import EditAssetForm from "./EditAssetForm";
+import { inferWarrantyTerm } from "@/lib/warranty";
 import { ArrowLeft } from "lucide-react";
 
 export default async function EditAssetPage({
@@ -61,6 +62,7 @@ export default async function EditAssetPage({
         provider: w.provider ?? "",
         startDate: toDateInput(w.startDate),
         endDate: toDateInput(w.endDate),
+        termMonths: inferWarrantyTerm(w.startDate, w.endDate),
       }
     : null;
 

@@ -6,7 +6,7 @@ import SubmitButton from "../components/SubmitButton";
 import { ShieldCheck, ArrowLeft, TriangleAlert } from "lucide-react";
 
 const ERROR_MESSAGES: Record<string, string> = {
-  length: "Mật khẩu mới phải có ít nhất 8 ký tự",
+  weak: "Mật khẩu mới phải có tối thiểu 12 ký tự, gồm chữ in hoa, chữ thường và số",
   mismatch: "Nhập lại mật khẩu mới không khớp",
 };
 

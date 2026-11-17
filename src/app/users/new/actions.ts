@@ -50,6 +50,20 @@ export async function createUserAction(
     return { error: "Thiếu thông tin tạo tài khoản" };
   }
 
+  // Bắt buộc chọn phạm vi xem — tránh tạo nhầm tài khoản "xem tất cả" do để
+  // trống. Phải có 1 trong: kho lẻ, khu vực, kho bổ sung, hoặc CHỌN CÓ CHỦ
+  // ĐÍCH "Tất cả kho" (scope=all).
+  const scopeChosen =
+    warehouseId !== null ||
+    regionId !== null ||
+    extraWarehouseIds.length > 0 ||
+    String(formData.get("scope") || "") === "all";
+  if (!scopeChosen) {
+    return {
+      error: 'Vui lòng chọn Phạm vi xem (một kho/khu vực, hoặc "Tất cả kho").',
+    };
+  }
+
   // Trước đây throw new Error() ở đây — nhưng Next.js che (redact) hết nội
   // dung message của lỗi throw trong Server Action khi chạy production
   // build, chỉ giữ lại message đầy đủ lúc chạy "next dev" (đây là lý do bug

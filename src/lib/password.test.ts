@@ -9,9 +9,19 @@ test("generateRandomPassword mặc định dài 12 ký tự", () => {
   assert.equal(password.length, 12);
 });
 
-test("generateRandomPassword tôn trọng độ dài truyền vào", () => {
+test("generateRandomPassword tôn trọng độ dài truyền vào (>= 12)", () => {
   assert.equal(generateRandomPassword(20).length, 20);
-  assert.equal(generateRandomPassword(1).length, 1);
+  // Độ dài tối thiểu bị ép lên 12 để luôn đạt chính sách mật khẩu.
+  assert.equal(generateRandomPassword(1).length, 12);
+});
+
+test("generateRandomPassword luôn đủ chữ thường + in hoa + số", () => {
+  for (let i = 0; i < 50; i++) {
+    const pw = generateRandomPassword(12);
+    assert.match(pw, /[a-z]/, "thiếu chữ thường");
+    assert.match(pw, /[A-Z]/, "thiếu chữ in hoa");
+    assert.match(pw, /[0-9]/, "thiếu chữ số");
+  }
 });
 
 test("generateRandomPassword chỉ dùng ký tự trong bảng chữ cho phép", () => {

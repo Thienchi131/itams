@@ -73,7 +73,7 @@ export async function login(
   // bật 2FA từ trước — đây là phiên đăng nhập MỚI, phải xác thực TOTP lại,
   // không được kế thừa trạng thái "đã xác thực" từ phiên cũ. requireLogin()
   // sẽ đá qua /setup-2fa hoặc /verify-2fa cho tới khi bước này hoàn tất.
-  cookieStore.set("userId", signSession(user.id, false), {
+  cookieStore.set("userId", signSession(user.id, false, user.passwordChangedAt.getTime()), {
     httpOnly: true,
     path: "/",
     sameSite: "lax",
@@ -94,18 +94,53 @@ export async function login(
 export async function upgradeSessionTo2FAVerified(userId: number) {
   const cookieStore = await cookies();
 
+  const row = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { passwordChangedAt: true },
+  });
+  if (!row) return;
+
   const isSecureCookie =
     process.env.COOKIE_SECURE === "false"
       ? false
       : process.env.NODE_ENV === "production";
 
-  cookieStore.set("userId", signSession(userId, true), {
+  cookieStore.set("userId", signSession(userId, true, row.passwordChangedAt.getTime()), {
     httpOnly: true,
     path: "/",
     sameSite: "lax",
     secure: isSecureCookie,
     maxAge: SESSION_MAX_AGE_MS / 1000,
   });
+}
+
+// Ký lại cookie phiên với passwordChangedAt MỚI — gọi ngay sau khi user TỰ
+// đổi mật khẩu để chính họ không bị đá ra; các phiên khác của họ (ký bằng mốc
+// cũ) vẫn bị vô hiệu như mong muốn. Admin reset mật khẩu user KHÁC thì KHÔNG
+// gọi hàm này (muốn giết sạch phiên của nạn nhân).
+export async function reissueSession(
+  userId: number,
+  twoFactorVerified: boolean,
+  passwordChangedAt: Date
+) {
+  const cookieStore = await cookies();
+
+  const isSecureCookie =
+    process.env.COOKIE_SECURE === "false"
+      ? false
+      : process.env.NODE_ENV === "production";
+
+  cookieStore.set(
+    "userId",
+    signSession(userId, twoFactorVerified, passwordChangedAt.getTime()),
+    {
+      httpOnly: true,
+      path: "/",
+      sameSite: "lax",
+      secure: isSecureCookie,
+      maxAge: SESSION_MAX_AGE_MS / 1000,
+    }
+  );
 }
 
 export async function getCurrentUser() {
@@ -141,6 +176,13 @@ export async function getCurrentUser() {
   });
 
   if (!user) return null;
+
+  // Phiên bị vô hiệu nếu mật khẩu đã đổi/reset sau khi cookie này được ký
+  // (mốc trong token không còn khớp DB). Đổi/reset mật khẩu => bump
+  // passwordChangedAt => giết sạch mọi phiên cũ. Xem reissueSession().
+  if (user.passwordChangedAt.getTime() !== session.passwordChangedAt) {
+    return null;
+  }
 
   const customWarehouseIds = user.warehouseAccess.map((w) => w.warehouseId);
 
@@ -207,6 +249,21 @@ export async function getOwnTwoFactorSecret(userId: number): Promise<string | nu
     select: { twoFactorSecret: true },
   });
   return row?.twoFactorSecret ?? null;
+}
+
+// Step-up: xác minh lại mật khẩu của CHÍNH user đang thao tác (dùng trước các
+// thao tác nhạy cảm của Admin: reset mật khẩu người khác, tắt IP whitelist...).
+// Trả false nếu bỏ trống hoặc sai — không throw để action tự xử lý thông báo.
+export async function verifyOwnPassword(
+  userId: number,
+  password: string
+): Promise<boolean> {
+  if (!password) return false;
+  const row = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { password: true },
+  });
+  return !!row && (await verifyPassword(password, row.password)).valid;
 }
 
 export async function requireLogin(options?: {

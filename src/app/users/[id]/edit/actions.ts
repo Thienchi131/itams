@@ -39,6 +39,17 @@ export async function updateUserAction(formData: FormData) {
     redirect(withFlash(editUrl, "err_user_invalid_email"));
   }
 
+  // Bắt buộc chọn phạm vi xem (giống trang Tạo) — không cho lưu tài khoản về
+  // trạng thái "xem tất cả" do để trống.
+  const scopeChosen =
+    warehouseId !== null ||
+    regionId !== null ||
+    extraWarehouseIds.length > 0 ||
+    String(formData.get("scope") || "") === "all";
+  if (!scopeChosen) {
+    redirect(withFlash(editUrl, "err_user_no_scope"));
+  }
+
   const [target, duplicate, newRole] = await Promise.all([
     prisma.user.findUnique({ where: { id }, include: { role: true } }),
     prisma.user.findFirst({ where: { username, NOT: { id } } }),

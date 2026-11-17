@@ -48,6 +48,8 @@ export const FLASH_MESSAGES: Record<string, string> = {
   err_user_duplicate_email: "Email này đã thuộc về tài khoản khác.",
   err_user_missing_fields: "Vui lòng nhập đủ Họ tên, Email và Quyền.",
   err_user_invalid_email: "Email không hợp lệ.",
+  err_user_no_scope:
+    'Vui lòng chọn Phạm vi xem (một kho/khu vực, hoặc "Tất cả kho").',
   err_user_last_admin: "Không thể hạ quyền Admin cuối cùng của hệ thống.",
 };
 

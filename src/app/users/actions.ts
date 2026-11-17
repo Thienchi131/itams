@@ -45,6 +45,8 @@ export async function resetUserPasswordAction(
       // password + gửi email) — phải bật cờ để user bắt buộc đổi lại ở lần
       // đăng nhập kế tiếp, giống như flow đổi password thủ công.
       mustChangePassword: true,
+      // Giết sạch phiên đang mở của user bị reset (xem session.ts).
+      passwordChangedAt: new Date(),
     },
   });
 

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useActionState, useCallback, useMemo, useState } from "react";
 import ModelSearchSelect from "./ModelSearchSelect";
 import SerialScannerModal from "./SerialScannerModal";
+import { WARRANTY_TERMS } from "@/lib/warranty";
 import ProductBarcodeScannerModal, {
   type BarcodeScanFeedback,
 } from "../../components/ProductBarcodeScannerModal";
@@ -512,9 +513,11 @@ export default function StockInForm({
                 <option value="" disabled>
                   Chọn thời hạn bảo hành
                 </option>
-                <option value="12">12 tháng</option>
-                <option value="24">24 tháng</option>
-                <option value="36">36 tháng</option>
+                {WARRANTY_TERMS.map((t) => (
+                  <option key={t} value={t}>
+                    {t} tháng
+                  </option>
+                ))}
               </select>
               {submitAttempted && missingWarranty && (
                 <p className="mt-1.5 text-xs font-semibold text-rose-600">

@@ -29,6 +29,14 @@ function unwrapCell(value: ExcelJS.CellValue): unknown {
       return (value as { result: unknown }).result;
     }
 
+    // Ô công thức CHƯA có kết quả lưu sẵn (file tạo bằng công cụ khác rồi
+    // upload thẳng, chưa mở/lưu lại bằng Excel): trước đây rơi xuống trả
+    // nguyên object -> String() thành "[object Object]" và bị ghi vào DB
+    // (đã gặp ở cột Tình trạng). Coi như ô trống.
+    if ("formula" in value || "sharedFormula" in value) {
+      return null;
+    }
+
     if ("text" in value) {
       return (value as { text: unknown }).text;
     }

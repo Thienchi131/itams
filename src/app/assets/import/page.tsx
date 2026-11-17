@@ -1,7 +1,7 @@
 import AppLayout from "../../components/AppLayout";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { ArrowLeft, TriangleAlert, CircleAlert, CircleSlash, CircleCheck } from "lucide-react";
+import { ArrowLeft, TriangleAlert, CircleAlert, CircleSlash, CircleCheck, FileSpreadsheet } from "lucide-react";
 import { importAssetsAction } from "./actions";
 import { requireRole } from "@/modules/auth/auth.service";
 import { ROLE_ADMIN, ROLE_IT } from "@/modules/auth/permissions";
@@ -61,13 +61,26 @@ export default async function ImportAssetsPage({
           Quay lại
         </Link>
 
-        <div>
-          <h1 className="text-4xl font-extrabold text-slate-900">
-            Import tài sản
-          </h1>
-          <p className="mt-2 text-slate-500">
-            Import thiết bị từ file Excel
-          </p>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">
+              Import tài sản
+            </h1>
+            <p className="mt-2 text-slate-500">
+              Import thiết bị từ file Excel
+            </p>
+          </div>
+
+          {/* File mẫu sinh từ dữ liệu hiện tại: danh sách chọn model/kho/
+              nhân viên + cột tự kiểm tra từng dòng trước khi upload. */}
+          <a
+            href="/assets/import/template"
+            download
+            className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
+          >
+            <FileSpreadsheet size={18} />
+            Tải file mẫu (.xlsx)
+          </a>
         </div>
 
         {error && (

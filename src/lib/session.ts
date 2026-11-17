@@ -22,6 +22,9 @@ export const SESSION_MAX_AGE_MS = 2 * 60 * 60 * 1000;
 export type SessionData = {
   userId: number;
   twoFactorVerified: boolean;
+  // Mốc passwordChangedAt (ms) được ký kèm trong token; getCurrentUser() đối
+  // chiếu lại với DB để vô hiệu phiên cũ sau khi đổi/reset mật khẩu.
+  passwordChangedAt: number;
 };
 
 /**
@@ -35,10 +38,14 @@ export type SessionData = {
  * vừa hoàn tất thiết lập lần đầu ở /setup-2fa). requireLogin() dựa vào cờ
  * này để chặn truy cập các trang khác cho tới khi bước 2FA hoàn tất.
  */
-export function signSession(userId: number, twoFactorVerified: boolean): string {
+export function signSession(
+  userId: number,
+  twoFactorVerified: boolean,
+  passwordChangedAt: number
+): string {
   const issuedAt = Date.now();
   const tfa = twoFactorVerified ? "1" : "0";
-  const payload = `${userId}.${issuedAt}.${tfa}`;
+  const payload = `${userId}.${issuedAt}.${tfa}.${passwordChangedAt}`;
 
   const signature = crypto
     .createHmac("sha256", getSecret())
@@ -59,11 +66,11 @@ export function verifySession(
 ): SessionData | null {
   if (!token) return null;
 
-  const [idPart, issuedAtPart, tfaPart, signature] = token.split(".");
+  const [idPart, issuedAtPart, tfaPart, pwPart, signature] = token.split(".");
 
-  if (!idPart || !issuedAtPart || !tfaPart || !signature) return null;
+  if (!idPart || !issuedAtPart || !tfaPart || !pwPart || !signature) return null;
 
-  const payload = `${idPart}.${issuedAtPart}.${tfaPart}`;
+  const payload = `${idPart}.${issuedAtPart}.${tfaPart}.${pwPart}`;
 
   const expected = crypto
     .createHmac("sha256", getSecret())
@@ -89,8 +96,11 @@ export function verifySession(
   }
 
   const userId = Number(idPart);
+  const passwordChangedAt = Number(pwPart);
 
-  if (!Number.isFinite(userId)) return null;
+  if (!Number.isFinite(userId) || !Number.isFinite(passwordChangedAt)) {
+    return null;
+  }
 
-  return { userId, twoFactorVerified: tfaPart === "1" };
+  return { userId, twoFactorVerified: tfaPart === "1", passwordChangedAt };
 }

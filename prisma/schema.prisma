@@ -29,6 +29,9 @@ model User {
   // (hẹp hơn, an toàn hơn về mặt lộ dữ liệu). Xem thêm getCurrentUser().
   warehouseId            Int?
   mustChangePassword     Boolean              @default(true)
+  // Mốc đặt/đổi mật khẩu lần cuối — nhúng vào token phiên (session.ts); đổi/
+  // reset mật khẩu sẽ bump mốc này để vô hiệu hoá mọi cookie phiên cũ.
+  passwordChangedAt      DateTime             @default(now())
   // twoFactorEnabled = đã thiết lập ÍT NHẤT 1 cách 2FA (app Authenticator
   // HOẶC YubiKey OTP). totpEnabled = riêng app Authenticator
   // đã xác nhận xong (twoFactorSecret có thể đang là secret chờ xác nhận).

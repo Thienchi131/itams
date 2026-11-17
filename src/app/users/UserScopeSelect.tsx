@@ -25,17 +25,24 @@ export default function UserScopeSelect({
   unassignedWarehouses,
   defaultRegionId,
   defaultWarehouseId,
+  defaultScopeAll = false,
 }: {
   regions: Region[];
   unassignedWarehouses: Warehouse[];
   defaultRegionId: number | null;
   defaultWarehouseId: number | null;
+  // true = tài khoản hiện đang "xem tất cả" (không gán kho/khu vực/kho bổ
+  // sung) -> dropdown chọn sẵn "Tất cả kho" thay vì placeholder. Dùng ở trang
+  // Sửa; trang Tạo mới không truyền (mặc định false -> buộc chọn).
+  defaultScopeAll?: boolean;
 }) {
   const initialValue = defaultWarehouseId
     ? `w:${defaultWarehouseId}`
     : defaultRegionId
       ? `r:${defaultRegionId}`
-      : "";
+      : defaultScopeAll
+        ? "all"
+        : "";
 
   const [value, setValue] = useState(initialValue);
 
@@ -49,7 +56,10 @@ export default function UserScopeSelect({
         onChange={(e) => setValue(e.target.value)}
         className="input-style"
       >
-        <option value="">Tất cả (không giới hạn)</option>
+        <option value="" disabled>
+          -- Chọn phạm vi xem --
+        </option>
+        <option value="all">Tất cả kho (không giới hạn)</option>
 
         {regions.map((region) => (
           <optgroup key={region.id} label={region.name}>
@@ -78,12 +88,14 @@ export default function UserScopeSelect({
 
       <input type="hidden" name="regionId" value={regionId} />
       <input type="hidden" name="warehouseId" value={warehouseId} />
+      <input type="hidden" name="scope" value={value} />
 
       <p className="mt-1.5 text-xs text-slate-400">
-        &quot;Toàn bộ khu vực&quot; dùng cho Lead phụ trách cả khu vực (nhiều
-        kho). &quot;Chỉ kho...&quot; dùng cho nhân viên chỉ phụ trách đúng 1
-        kho lẻ, không thấy các kho khác kể cả cùng khu vực. Để trống = xem
-        được tất cả (chỉ nên dùng cho Admin).
+        Bắt buộc chọn phạm vi: &quot;Toàn bộ khu vực&quot; (Lead, nhiều kho),
+        &quot;Chỉ kho...&quot; (1 kho lẻ), hoặc &quot;Tất cả kho&quot; (xem
+        toàn hệ thống — chỉ nên dùng cho Admin/kế toán). Cần xem nhiều kho cắt
+        ngang khu vực thì để ô này ở &quot;-- Chọn phạm vi xem --&quot; rồi
+        chọn tại &quot;Kho bổ sung&quot; bên dưới.
       </p>
     </div>
   );

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getAssetById } from "@/modules/asset/asset.service";
 import { truncateSerial } from "@/lib/format";
 import LocalDateTime from "../../components/LocalDateTime";
+import { warrantyDaysLeft } from "@/lib/warranty";
 import {
   getAssetStatusLabel,
   getHistoryActionLabel,
@@ -125,6 +126,7 @@ export default async function AssetDetailPage({
   }
 
   const warranty = asset.warranties[0];
+  const warrantyLeft = warrantyDaysLeft(warranty?.endDate ?? null);
   const canManageAsset = canEditData(currentUser.role.name);
   // Trang "Chỉnh sửa thiết bị" (Asset Tag/Serial/Model/cấu hình...) giờ CHỈ
   // Admin được vào — IT vẫn dùng được các thao tác nhanh khác (bàn giao/thu
@@ -497,6 +499,22 @@ Thiết bị đã được tiếp nhận về kho.`;
                       )
                     }
                   />
+
+                  {warrantyLeft !== null && (
+                    <InfoRow
+                      icon={<ShieldCheck />}
+                      label="Tình trạng"
+                      value={
+                        warrantyLeft >= 0 ? (
+                          <span className="font-bold text-emerald-600">
+                            Còn {warrantyLeft} ngày bảo hành
+                          </span>
+                        ) : (
+                          <span className="font-bold text-rose-600">Hết bảo hành</span>
+                        )
+                      }
+                    />
+                  )}
 
                   <InfoRow
                     icon={<Info />}

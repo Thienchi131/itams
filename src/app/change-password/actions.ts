@@ -1,9 +1,10 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { requireLogin } from "@/modules/auth/auth.service";
+import { requireLogin, reissueSession } from "@/modules/auth/auth.service";
 import { getDefaultRouteForRole } from "@/modules/auth/permissions";
 import { hashPassword, verifyPassword } from "@/lib/password-hash";
+import { validatePassword } from "@/lib/password-policy";
 import { redirect } from "next/navigation";
 import { withFlash } from "@/lib/flash";
 
@@ -29,8 +30,9 @@ export async function changeOwnPasswordAction(formData: FormData) {
     redirect("/change-password?error=current");
   }
 
-  if (newPassword.length < 8) {
-    redirect("/change-password?error=length");
+  const passwordError = validatePassword(newPassword);
+  if (passwordError) {
+    redirect("/change-password?error=weak");
   }
 
   if (newPassword !== confirmPassword) {
@@ -42,14 +44,20 @@ export async function changeOwnPasswordAction(formData: FormData) {
   }
 
   const hashedPassword = await hashPassword(newPassword);
+  const passwordChangedAt = new Date();
 
   await prisma.user.update({
     where: { id: user.id },
     data: {
       password: hashedPassword,
       mustChangePassword: false,
+      passwordChangedAt,
     },
   });
+
+  // Ký lại cookie của CHÍNH người vừa đổi để họ không bị đăng xuất ngay lập
+  // tức; các phiên khác (nếu có) vẫn bị vô hiệu vì ký bằng mốc cũ.
+  await reissueSession(user.id, user.twoFactorVerified, passwordChangedAt);
 
   redirect(withFlash(getDefaultRouteForRole(user.role.name), "own_password_changed"));
 }

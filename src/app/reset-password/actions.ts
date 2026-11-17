@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password-hash";
+import { validatePassword } from "@/lib/password-policy";
 import { redirect } from "next/navigation";
 import { hashResetToken } from "@/lib/reset-token";
 
@@ -14,8 +15,9 @@ export async function resetPasswordAction(formData: FormData) {
     redirect("/forgot-password?error=invalid_token");
   }
 
-  if (newPassword.length < 8) {
-    redirect(`/reset-password?token=${token}&error=length`);
+  const passwordError = validatePassword(newPassword);
+  if (passwordError) {
+    redirect(`/reset-password?token=${token}&error=weak`);
   }
 
   if (newPassword !== confirmPassword) {
@@ -49,6 +51,8 @@ export async function resetPasswordAction(formData: FormData) {
         // Đã tự đặt mật khẩu mới theo ý mình (không phải mật khẩu tạm do
         // Admin/hệ thống sinh ra) nên không cần ép đổi lại lần nữa.
         mustChangePassword: false,
+        // Giết sạch phiên cũ (xem session.ts).
+        passwordChangedAt: new Date(),
       },
     }),
     prisma.passwordResetToken.update({

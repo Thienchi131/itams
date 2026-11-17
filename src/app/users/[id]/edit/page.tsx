@@ -104,6 +104,11 @@ export default async function EditUserPage({
                   unassignedWarehouses={unassignedWarehouses}
                   defaultRegionId={user.regionId}
                   defaultWarehouseId={user.warehouseId}
+                  defaultScopeAll={
+                    user.regionId === null &&
+                    user.warehouseId === null &&
+                    user.warehouseAccess.length === 0
+                  }
                 />
               </Field>
 

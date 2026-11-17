@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Save, X, TriangleAlert } from "lucide-react";
 import { updateAssetAction, type UpdateAssetState } from "./actions";
 import ModelPicker from "./ModelPicker";
+import { WARRANTY_TERMS } from "@/lib/warranty";
 
 type ModelItem = {
   id: number;
@@ -41,7 +42,7 @@ type Asset = {
   };
 };
 
-type WarrantyInfo = { provider: string; startDate: string; endDate: string };
+type WarrantyInfo = { provider: string; startDate: string; endDate: string; termMonths: string };
 
 export default function EditAssetForm({
   asset,
@@ -234,13 +235,22 @@ export default function EditAssetForm({
                 />
               </div>
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">Ngày kết thúc</label>
-                <input
-                  type="date"
-                  name="warrantyEnd"
-                  defaultValue={warranty?.endDate ?? ""}
+                <label className="mb-2 block text-sm font-semibold text-slate-700">Thời hạn bảo hành</label>
+                <select
+                  name="warrantyMonths"
+                  defaultValue={warranty?.termMonths ?? ""}
                   className="w-full rounded-lg border px-4 py-3"
-                />
+                >
+                  <option value="">— giữ nguyên ngày kết thúc —</option>
+                  {WARRANTY_TERMS.map((t) => (
+                    <option key={t} value={t}>
+                      {t} tháng
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-xs text-slate-400">
+                  Ngày kết thúc = ngày bắt đầu + số tháng chọn.
+                </p>
               </div>
             </div>
           )}

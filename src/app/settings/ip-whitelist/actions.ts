@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/modules/auth/auth.service";
+import { requireRole, verifyOwnPassword } from "@/modules/auth/auth.service";
 import { redirect } from "next/navigation";
 import { isValidWhitelistEntry } from "@/lib/ip-whitelist";
 import { createAuditLog } from "@/modules/audit/audit-log.service";
@@ -68,6 +68,20 @@ export async function setWhitelistEnabledAction(formData: FormData) {
   const currentUser = await requireRole(REQUIRE_ROLES);
 
   const enabled = formData.get("enabled") === "true";
+
+  // Step-up: TẮT whitelist = mở hệ thống ra mọi IP -> bắt Admin nhập lại mật
+  // khẩu của chính mình để xác nhận. Bật whitelist là chiều an toàn hơn nên
+  // không cần.
+  if (!enabled) {
+    const adminPassword = String(formData.get("adminPassword") || "");
+    if (!(await verifyOwnPassword(currentUser.id, adminPassword))) {
+      redirect(
+        `/settings/ip-whitelist?error=${encodeURIComponent(
+          "Mật khẩu xác nhận không đúng — chưa tắt whitelist."
+        )}`
+      );
+    }
+  }
 
   // Chặn bật whitelist khi danh sách đang trống — bật trong trường hợp đó
   // chắc chắn tự khoá TẤT CẢ mọi người (kể cả Admin) ra khỏi hệ thống ngay
