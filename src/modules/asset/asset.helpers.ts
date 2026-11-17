@@ -66,6 +66,7 @@ export const ASSIGNMENT_TYPE_LABEL: Record<AssignmentType, string> = {
   LOAN: "Cấp mượn",
   WARRANTY_HOLD: "Cấp tạm chờ bảo hành",
   EXCHANGE: "Cấp đổi thiết bị",
+  ADDITIONAL: "Cấp thêm thiết bị cho nhân viên",
 };
 
 // Nhãn "Loại phiếu" cho phiếu nhập kho — dùng chung giữa cột "Loại phiếu" ở

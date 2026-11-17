@@ -32,7 +32,7 @@ type Employee = {
 
 type Accessory = { name: string; quantity: number };
 
-type AssignmentType = "PERMANENT" | "LOAN" | "WARRANTY_HOLD" | "EXCHANGE";
+type AssignmentType = "PERMANENT" | "LOAN" | "WARRANTY_HOLD" | "EXCHANGE" | "ADDITIONAL";
 
 // Nhãn + mô tả hạn cảnh báo cho từng loại — giữ đồng bộ với
 // ASSIGNMENT_TYPE_LABEL/ASSIGNMENT_WARNING_DAYS trong asset.helpers.ts (phía
@@ -62,6 +62,11 @@ const ASSIGNMENT_TYPE_OPTIONS: {
     value: "EXCHANGE",
     label: "Cấp đổi thiết bị",
     hint: "Thu hồi ngay 1 thiết bị nhân viên đang giữ để đổi lấy máy này — không có hạn.",
+  },
+  {
+    value: "ADDITIONAL",
+    label: "Cấp thêm thiết bị cho nhân viên",
+    hint: "Nhân viên đã có máy, cấp thêm 1 máy chính thức nữa — không có hạn.",
   },
 ];
 

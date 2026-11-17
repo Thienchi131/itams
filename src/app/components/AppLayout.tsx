@@ -22,7 +22,7 @@ import {
 
 import { requireLogin } from "@/modules/auth/auth.service";
 import { canAccessMenu, canEditData, ROLE_IT } from "@/modules/auth/permissions";
-import { countEmployeesWithOverdueHandoverPhotos } from "@/modules/asset/handover-photo.service";
+import { getHandoverPhotoReminderData } from "@/modules/asset/handover-photo.service";
 import { HANDOVER_PHOTO_DUE_DAYS } from "@/modules/asset/handover-photo.helpers";
 import { logoutAction } from "@/app/logout/actions";
 import {
@@ -35,6 +35,7 @@ import AppMenuLink from "./AppMenuLink";
 import AppTopbar from "./AppTopbar";
 import NotificationBell from "./NotificationBell";
 import RejectedTransferBanner from "./RejectedTransferBanner";
+import LoginReminders from "./LoginReminders";
 
 export default async function AppLayout({
   children,
@@ -81,9 +82,10 @@ export default async function AppLayout({
   // chỉ Admin/IT (người bổ sung được ảnh), theo phạm vi kho. Chỉ nhắc khi đã
   // quá hạn để banner không hiện sau MỌI lượt bàn giao; danh sách đầy đủ ở
   // /assets/handover-photos.
-  const overdueHandoverPhotoCount = canEditData(roleName)
-    ? await countEmployeesWithOverdueHandoverPhotos(user.regionWarehouseIds)
-    : 0;
+  const handoverPhotoData = canEditData(roleName)
+    ? await getHandoverPhotoReminderData(user.fullName, user.regionWarehouseIds)
+    : { overdueEmployeeCount: 0, myTotal: 0, myOverdue: 0 };
+  const overdueHandoverPhotoCount = handoverPhotoData.overdueEmployeeCount;
 
   // Banner "to" cho kho NGUỒN khi 1 lượt chuyển đi bị kho đích từ chối —
   // trước đây chỉ có trong chuông thông báo (NotificationBell), user phản
@@ -106,6 +108,11 @@ export default async function AppLayout({
 
   return (
     <main className="min-h-screen bg-[#f4f8fc] text-slate-900">
+      <LoginReminders
+        handoverTotal={handoverPhotoData.myTotal}
+        handoverOverdue={handoverPhotoData.myOverdue}
+        transferCount={canEditData(roleName) ? pendingTransfers.length : 0}
+      />
       {/* Màn hình hẹp (< lg): sidebar ẩn, mở bằng nút menu. Dùng checkbox +
           peer-checked thuần CSS (không cần JS) — AppMenuLink tự bỏ tick khi
           bấm 1 mục để menu đóng sau khi chuyển trang. */}

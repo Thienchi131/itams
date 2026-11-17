@@ -1,4 +1,5 @@
 import { loginAction } from "./actions";
+import ClearLoginRemindersFlag from "./ClearLoginRemindersFlag";
 import PasswordInput from "./PasswordInput";
 import ForgotPasswordLink from "./ForgotPasswordLink";
 import GoogleLoginButton from "./GoogleLoginButton";
@@ -22,6 +23,7 @@ export default async function LoginPage({
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
+      <ClearLoginRemindersFlag />
       <div className="flex w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl">
         {/* Cột trái — giới thiệu, chỉ để trang trí, không có logic. Nền là
             ảnh bầu trời thật; khối chữ đặt trong thẻ kính mờ (frosted glass)

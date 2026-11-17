@@ -26,7 +26,8 @@ function parseAssignmentType(value: FormDataEntryValue | null): AssignmentType |
   return value === "PERMANENT" ||
     value === "LOAN" ||
     value === "WARRANTY_HOLD" ||
-    value === "EXCHANGE"
+    value === "EXCHANGE" ||
+    value === "ADDITIONAL"
     ? value
     : null;
 }

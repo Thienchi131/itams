@@ -254,12 +254,19 @@ export async function getPendingHandoverPhotosByEmployee(warehouseIds?: number[]
       const overdueCount = group.items.filter((i) => i.status.kind === "overdue").length;
       // items đã sắp theo photoDueAt tăng dần -> phần tử đầu là hạn gần nhất.
       const earliest = group.items[0];
+      // Người cấp phát (createdBy của lượt bàn giao) — gom distinct để biết báo
+      // đúng IT nào bổ sung ảnh. Thường 1 người/lô, nhưng 1 nhân viên có thể
+      // nhận máy từ nhiều IT khác nhau nên liệt kê hết.
+      const handedOverBy = Array.from(
+        new Set(group.items.map((i) => i.createdBy).filter((v): v is string => !!v))
+      );
       return {
         employee: group.employee,
         items: group.items,
         overdueCount,
         earliestDueAt: earliest.photoDueAt,
         earliestStatus: earliest.status,
+        handedOverBy,
       };
     })
     .sort((a, b) => {
@@ -282,4 +289,31 @@ export async function countEmployeesWithOverdueHandoverPhotos(warehouseIds?: num
       .map((item) => item.asset.currentEmployeeId)
   );
   return employeeIds.size;
+}
+
+/**
+ * Dữ liệu cho AppLayout trong 1 lần query: số NHÂN VIÊN có thiết bị quá hạn
+ * (banner chung) + phần RIÊNG của người đang đăng nhập với tư cách NGƯỜI CẤP
+ * PHÁT (createdBy = fullName) — dùng cho popup nhắc bổ sung ảnh khi họ login.
+ * Gộp để không phải chạy getPendingHandoverPhotos() 2 lần mỗi trang.
+ */
+export async function getHandoverPhotoReminderData(
+  fullName: string,
+  warehouseIds?: number[] | null
+) {
+  const items = await getPendingHandoverPhotos(warehouseIds);
+
+  const overdueEmployeeIds = new Set(
+    items
+      .filter((item) => item.status.kind === "overdue")
+      .map((item) => item.asset.currentEmployeeId)
+  );
+
+  const mine = fullName ? items.filter((item) => item.createdBy === fullName) : [];
+
+  return {
+    overdueEmployeeCount: overdueEmployeeIds.size,
+    myTotal: mine.length,
+    myOverdue: mine.filter((item) => item.status.kind === "overdue").length,
+  };
 }

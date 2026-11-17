@@ -706,6 +706,10 @@ enum AssignmentType {
   // hạn cảnh báo (giống PERMANENT, không nằm trong ASSIGNMENT_WARNING_DAYS)
   // vì thiết bị mới thay thế coi như chính thức của nhân viên đó luôn.
   EXCHANGE
+  // Cấp thêm thiết bị cho nhân viên đã có máy — máy chính thức, KHÔNG có hạn
+  // cảnh báo (giống PERMANENT), tách riêng chỉ để thống kê rõ "cấp mới" vs
+  // "cấp thêm".
+  ADDITIONAL
 }
 
 // Tag gắn cho AssetModel ở Cài đặt > Tag Model — xem ghi chú đầy đủ ở field

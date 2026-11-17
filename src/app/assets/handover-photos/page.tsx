@@ -116,6 +116,12 @@ export default async function HandoverPhotosPendingPage({
                   <p className="text-xs text-slate-500">
                     {group.employee.employeeCode} · {group.items.length} thiết bị chưa có ảnh
                   </p>
+                  {group.handedOverBy.length > 0 && (
+                    <p className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-blue-600">
+                      <UserRound size={12} className="shrink-0" />
+                      Cấp phát: {group.handedOverBy.join(", ")}
+                    </p>
+                  )}
                 </div>
 
                 <StatusBadge status={group.earliestStatus} overdueCount={group.overdueCount} />
